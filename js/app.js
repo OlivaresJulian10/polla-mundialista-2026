@@ -148,9 +148,57 @@ async function start(user) {
   el("userBox").classList.remove("hidden");
   el("userName").textContent = profile?.display_name || user.email;
   el("navAdmin").classList.toggle("hidden", !profile?.is_admin);
+  renderHeaderAvatar();
 
   await loadMatchesAndPreds();
   showView("matches");
+}
+
+// =====================================================================
+//  Foto de perfil (avatar)
+// =====================================================================
+function avatarHtml(url, name) {
+  if (url) return `<img class="avatar avatar-sm" src="${url}" alt="" loading="lazy" />`;
+  const ini = (name || "?").trim().charAt(0).toUpperCase();
+  return `<span class="avatar avatar-sm avatar-fallback">${ini}</span>`;
+}
+
+function renderHeaderAvatar() {
+  const img = el("userAvatar"), fb = el("userInitial");
+  const url = state.profile?.avatar_url;
+  const name = state.profile?.display_name || "?";
+  if (url) {
+    img.src = url; img.classList.remove("hidden"); fb.classList.add("hidden");
+  } else {
+    img.classList.add("hidden"); fb.classList.remove("hidden");
+    fb.textContent = name.trim().charAt(0).toUpperCase();
+  }
+}
+
+el("avatarBtn").onclick = () => el("avatarInput").click();
+el("avatarInput").onchange = (e) => uploadAvatar(e.target.files[0]);
+
+async function uploadAvatar(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return toast("Selecciona una imagen", "error");
+  if (file.size > 3 * 1024 * 1024) return toast("Máximo 3 MB", "error");
+
+  toast("Subiendo foto…");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${state.user.id}/avatar.${ext}`;
+  const { error: upErr } = await sb.storage
+    .from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+  if (upErr) return toast("Error al subir: " + upErr.message, "error");
+
+  const { data: { publicUrl } } = sb.storage.from("avatars").getPublicUrl(path);
+  const url = publicUrl + "?t=" + Date.now();
+  const { error: updErr } = await sb.from("profiles").update({ avatar_url: url }).eq("id", state.user.id);
+  if (updErr) return toast("Error al guardar: " + updErr.message, "error");
+
+  state.profile.avatar_url = url;
+  renderHeaderAvatar();
+  el("avatarInput").value = "";
+  toast("Foto actualizada ✅");
 }
 
 // =====================================================================
@@ -318,7 +366,7 @@ async function loadRanking() {
     const medal = i === 0 ? "🥇 " : i === 1 ? "🥈 " : i === 2 ? "🥉 " : "";
     html += `<tr class="${me ? "me" : ""}">
       <td class="num"><span class="${posClass}">${i + 1}</span></td>
-      <td>${medal}${row.display_name}${me ? " (tú)" : ""}</td>
+      <td><span class="player">${avatarHtml(row.avatar_url, row.display_name)}<span>${medal}${row.display_name}${me ? " (tú)" : ""}</span></span></td>
       <td class="num"><span class="pts-big">${row.points}</span></td>
       <td class="num">${row.hits}</td>
       <td class="num col-opt">${row.exacts}</td>

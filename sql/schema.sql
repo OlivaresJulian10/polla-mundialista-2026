@@ -17,6 +17,7 @@ drop function if exists public.handle_new_user() cascade;
 create table public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   display_name text not null,
+  avatar_url   text,
   is_admin     boolean not null default false,
   created_at   timestamptz not null default now()
 );
