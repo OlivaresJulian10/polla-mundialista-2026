@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Polla Mundialista 2026</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="ball">⚽</span>
+      <div>
+        <h1>Polla Mundialista</h1>
+        <small>Copa del Mundo 2026</small>
+      </div>
+    </div>
+    <nav id="nav" class="nav hidden">
+      <button data-view="matches" class="active">Mis pronósticos</button>
+      <button data-view="ranking">Ranking</button>
+      <button data-view="admin" id="navAdmin" class="hidden">Admin</button>
+    </nav>
+    <div id="userBox" class="user-box hidden">
+      <span id="userName"></span>
+      <button id="logoutBtn" class="ghost">Salir</button>
+    </div>
+  </header>
+
+  <main id="app">
+
+    <!-- ===================== LOGIN / REGISTRO ===================== -->
+    <section id="authView" class="view auth">
+      <div class="card">
+        <div class="tabs">
+          <button id="tabLogin" class="tab active">Iniciar sesión</button>
+          <button id="tabSignup" class="tab">Crear cuenta</button>
+        </div>
+
+        <form id="loginForm" class="form">
+          <label>Correo
+            <input type="email" id="loginEmail" required autocomplete="email" />
+          </label>
+          <label>Contraseña
+            <input type="password" id="loginPass" required autocomplete="current-password" />
+          </label>
+          <button type="submit" class="primary">Entrar</button>
+        </form>
+
+        <form id="signupForm" class="form hidden">
+          <label>Nombre para mostrar
+            <input type="text" id="signupName" required maxlength="40" placeholder="Ej: Julián O." />
+          </label>
+          <label>Correo
+            <input type="email" id="signupEmail" required autocomplete="email" />
+          </label>
+          <label>Contraseña (mín. 6 caracteres)
+            <input type="password" id="signupPass" required minlength="6" autocomplete="new-password" />
+          </label>
+          <button type="submit" class="primary">Crear cuenta</button>
+        </form>
+
+        <p id="authMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <!-- ===================== MIS PRONÓSTICOS ===================== -->
+    <section id="matchesView" class="view hidden">
+      <div class="rules">
+        Marcador exacto = <b>5 pts</b> · Acertar resultado = <b>3 pts</b> · Fallar = <b>0</b>.
+        Puedes editar hasta que empiece el partido.
+      </div>
+      <div id="matchesContainer"></div>
+    </section>
+
+    <!-- ===================== RANKING ===================== -->
+    <section id="rankingView" class="view hidden">
+      <h2>Tabla de posiciones</h2>
+      <div id="rankingContainer"></div>
+    </section>
+
+    <!-- ===================== ADMIN ===================== -->
+    <section id="adminView" class="view hidden">
+      <h2>Cargar resultados reales</h2>
+      <p class="muted">Escribe el marcador final de cada partido jugado y guarda. El ranking se recalcula solo.</p>
+      <div id="adminContainer"></div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
