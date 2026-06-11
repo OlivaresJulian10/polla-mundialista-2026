@@ -203,6 +203,32 @@ table.rank tr.me{background:#13261a}
 .toast.ok{border-color:var(--primary)} .toast.error{border-color:var(--danger)}
 
 .loading{color:var(--muted); padding:2rem; text-align:center}
+.all-done{color:var(--primary-2)}
+
+/* Modal (ver pronósticos de un usuario) */
+.modal{
+  position:fixed; inset:0; background:rgba(0,0,0,.62); backdrop-filter:blur(3px);
+  z-index:60; display:flex; align-items:center; justify-content:center; padding:1rem;
+}
+.modal-box{
+  background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  width:100%; max-width:580px; max-height:86vh; display:flex; flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+}
+.modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:1rem 1.2rem; border-bottom:1px solid var(--line);
+}
+.modal-head h3{margin:0; font-size:1.05rem}
+.modal-body{padding:.6rem 1.2rem 1rem; overflow-y:auto}
+.pred-row{
+  display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+  padding:.55rem 0; border-bottom:1px solid var(--line); font-size:.9rem;
+}
+.pred-row:last-child{border-bottom:none}
+.pred-teams{display:flex; align-items:center; gap:.35rem; flex-wrap:wrap}
+.pred-teams .crest{width:20px; height:20px}
+.pred-teams b{color:var(--primary-2)}
 
 /* ===== TABLET / iPad / ESCRITORIO: partidos en 2 columnas ===== */
 @media (min-width:760px){

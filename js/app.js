@@ -426,7 +426,65 @@ function renderAdmin() {
   cont.querySelectorAll("[data-save]").forEach((btn) => {
     btn.onclick = () => saveResult(Number(btn.dataset.save));
   });
+
+  loadParticipation();
 }
+
+// ----- Participación (solo admin) -----
+async function loadParticipation() {
+  const cont = el("participationContainer");
+  const total = state.matches.length;
+  const { data, error } = await sb.rpc("admin_participation");
+  if (error) { cont.innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
+  if (!data?.length) { cont.innerHTML = '<div class="loading">Aún no hay jugadores.</div>'; return; }
+
+  let html = `<div class="rank-wrap"><table class="rank"><thead><tr>
+    <th>Jugador</th><th class="num">Pronósticos</th><th>Último cambio</th><th class="num"></th>
+    </tr></thead><tbody>`;
+  data.forEach((row) => {
+    const n = Number(row.total);
+    const done = n >= total && total > 0;
+    html += `<tr>
+      <td><span class="player">${avatarHtml(row.avatar_url, row.display_name)}<span>${row.display_name}</span></span></td>
+      <td class="num"><b class="${done ? "all-done" : ""}">${n}</b><span class="muted">/${total}</span></td>
+      <td class="muted">${row.last_update ? fmtDate(row.last_update) : "—"}</td>
+      <td class="num">${n > 0 ? `<button class="ghost" data-view="${row.user_id}" data-name="${encodeURIComponent(row.display_name)}">Ver</button>` : ""}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  cont.innerHTML = html;
+
+  cont.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.onclick = () => viewUserPredictions(btn.dataset.view, decodeURIComponent(btn.dataset.name));
+  });
+}
+
+async function viewUserPredictions(uid, name) {
+  el("modalTitle").textContent = "Pronósticos de " + name;
+  el("modalBody").innerHTML = '<div class="loading">Cargando…</div>';
+  el("modal").classList.remove("hidden");
+
+  const { data, error } = await sb.rpc("admin_user_predictions", { p_user: uid });
+  if (error) { el("modalBody").innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
+  if (!data?.length) { el("modalBody").innerHTML = '<div class="loading">Sin pronósticos.</div>'; return; }
+
+  let html = "";
+  for (const r of data) {
+    const played = r.home_score != null && r.away_score != null;
+    const pred = { pred_home: r.pred_home, pred_away: r.pred_away };
+    const pts = played ? pointsFor(pred, { home_score: r.home_score, away_score: r.away_score }) : null;
+    const ptsTxt = pts != null ? `<span class="badge pts">+${pts}</span>` : "";
+    const realTxt = played ? `<span class="muted"> · real ${r.home_score}–${r.away_score}</span>` : "";
+    html += `<div class="pred-row">
+      <span class="pred-teams">${crest(r.home_team)} ${r.home_team} <b>${r.pred_home}–${r.pred_away}</b> ${r.away_team} ${crest(r.away_team)}</span>
+      <span>${ptsTxt}${realTxt}</span>
+    </div>`;
+  }
+  el("modalBody").innerHTML = html;
+}
+
+el("modalClose").onclick = () => el("modal").classList.add("hidden");
+el("modal").onclick = (e) => { if (e.target.id === "modal") el("modal").classList.add("hidden"); };
 
 async function saveResult(mid) {
   const home = document.querySelector(`#adminContainer .score-input[data-mid="${mid}"][data-side="home"]`).value;
