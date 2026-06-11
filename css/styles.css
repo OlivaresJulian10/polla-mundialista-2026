@@ -121,6 +121,17 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 }
 .rules b{color:var(--text)}
 
+/* Encabezado "Hoy" */
+.today-head{
+  background:linear-gradient(135deg, rgba(34,197,94,.20), rgba(56,189,248,.16));
+  border:1px solid rgba(255,255,255,.12); border-radius:16px;
+  padding:1.1rem 1.3rem; margin-bottom:1.3rem;
+}
+.today-title{font-size:1.25rem; font-weight:800}
+.today-date{color:var(--muted); text-transform:capitalize; margin-top:.15rem}
+.today-stats{display:flex; gap:1.1rem; flex-wrap:wrap; margin-top:.7rem; color:var(--muted); font-size:.92rem}
+.today-stats b{color:var(--text)}
+
 /* Group blocks */
 .group{margin-bottom:1.8rem}
 .group-title{

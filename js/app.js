@@ -67,6 +67,10 @@ const LOCK_MINUTES = 10;
 const isLocked = (m) =>
   m.kickoff && new Date(m.kickoff).getTime() - LOCK_MINUTES * 60000 <= Date.now();
 
+// Fecha (YYYY-MM-DD) en hora Colombia, para saber "qué partidos son hoy"
+const bogotaYMD = (d) => new Date(d).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+const todayYMD = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+
 function pointsFor(pred, m) {
   if (!pred || m.home_score == null || m.away_score == null) return null;
   if (pred.pred_home === m.home_score && pred.pred_away === m.away_score) return 5;
@@ -113,12 +117,14 @@ function traducirError(msg = "") {
 // =====================================================================
 //  Navegación entre vistas
 // =====================================================================
-const VIEWS = ["matches", "ranking", "admin"];
+const VIEWS = ["today", "matches", "ranking", "admin"];
 function showView(name) {
   VIEWS.forEach((v) => el(v + "View").classList.toggle("hidden", v !== name));
   document.querySelectorAll("#nav button").forEach((b) =>
     b.classList.toggle("active", b.dataset.view === name)
   );
+  if (name === "today") renderToday();
+  if (name === "matches") renderMatches();
   if (name === "ranking") loadRanking();
   if (name === "admin") renderAdmin();
 }
@@ -154,7 +160,7 @@ async function start(user) {
   renderHeaderAvatar();
 
   await loadMatchesAndPreds();
-  showView("matches");
+  showView("today");
 }
 
 // =====================================================================
@@ -277,7 +283,72 @@ function renderMatches() {
       el("saveHint").textContent = "Tienes cambios sin guardar…";
     });
   });
-  el("saveAllBtn").onclick = saveAllPredictions;
+  el("saveAllBtn").onclick = () =>
+    saveAllPredictions(el("matchesContainer"), el("saveAllBtn"), "saveHint");
+}
+
+// =====================================================================
+//  Vista: HOY (partidos del día)
+// =====================================================================
+function renderToday() {
+  const cont = el("todayContainer");
+  if (!state.matches.length) {
+    cont.innerHTML = '<div class="loading">Aún no hay partidos cargados.</div>';
+    return;
+  }
+
+  const hoy = todayYMD();
+  const partidosHoy = state.matches.filter((m) => m.kickoff && bogotaYMD(m.kickoff) === hoy);
+  const fechaLinda = new Date().toLocaleDateString("es-CO", {
+    weekday: "long", day: "numeric", month: "long", timeZone: "America/Bogota",
+  });
+
+  // Resumen del día: cuántos hay, cuántos pronosticaste, cuántos cerrados
+  const pronost = partidosHoy.filter((m) => state.myPreds[m.id]).length;
+  const cerrados = partidosHoy.filter((m) => isLocked(m)).length;
+
+  let lista = partidosHoy;
+  let encabezado;
+  if (partidosHoy.length) {
+    encabezado = `
+      <div class="today-head">
+        <div class="today-title">📅 Partidos de hoy</div>
+        <div class="today-date">${fechaLinda}</div>
+        <div class="today-stats">
+          <span>⚽ <b>${partidosHoy.length}</b> partidos</span>
+          <span>📝 <b>${pronost}</b> pronosticados</span>
+          <span>🔒 <b>${cerrados}</b> cerrados</span>
+        </div>
+      </div>`;
+  } else {
+    // No hay hoy: muestro los próximos
+    lista = state.matches
+      .filter((m) => m.kickoff && new Date(m.kickoff) > new Date())
+      .slice(0, 6);
+    encabezado = `
+      <div class="today-head">
+        <div class="today-title">📅 Hoy no hay partidos del Mundial</div>
+        <div class="today-date">${fechaLinda}</div>
+        <div class="today-stats"><span>Aquí van los <b>próximos</b> partidos 👇</span></div>
+      </div>`;
+  }
+
+  let html = encabezado;
+  for (const m of lista) html += matchRow(m);
+  if (lista.length) {
+    html += `<div class="save-row">
+      <button class="primary" id="saveTodayBtn">Guardar pronósticos</button>
+      <span class="muted" id="saveHintToday"></span></div>`;
+  }
+  cont.innerHTML = html;
+
+  cont.querySelectorAll(".score-input").forEach((inp) => {
+    inp.addEventListener("input", () => {
+      const h = el("saveHintToday"); if (h) h.textContent = "Cambios sin guardar…";
+    });
+  });
+  const btn = el("saveTodayBtn");
+  if (btn) btn.onclick = () => saveAllPredictions(cont, btn, "saveHintToday");
 }
 
 function matchRow(m) {
@@ -314,10 +385,12 @@ function matchRow(m) {
   </div>`;
 }
 
-async function saveAllPredictions() {
-  // Recolectar los dos marcadores de cada partido
+async function saveAllPredictions(container, btn, hintId) {
+  container = container || el("matchesContainer");
+  btn = btn || el("saveAllBtn");
+  // Recolectar los dos marcadores de cada partido (solo dentro de este contenedor)
   const byMatch = {};
-  document.querySelectorAll(".score-input").forEach((inp) => {
+  container.querySelectorAll(".score-input").forEach((inp) => {
     const mid = Number(inp.dataset.mid);
     (byMatch[mid] ||= {})[inp.dataset.side] = inp.value === "" ? null : Number(inp.value);
   });
@@ -341,7 +414,7 @@ async function saveAllPredictions() {
     return toast(omitidosCerrados ? "Esos partidos ya están cerrados" : "Escribe al menos un marcador completo", "error");
   }
 
-  const btn = el("saveAllBtn");
+  const savingText = btn.textContent;
   btn.disabled = true; btn.textContent = "Guardando...";
 
   // Intento en lote; si falla, guardo uno por uno para no perder los válidos
@@ -359,8 +432,8 @@ async function saveAllPredictions() {
     }
   }
 
-  btn.disabled = false; btn.textContent = "Guardar pronósticos";
-  el("saveHint").textContent = "";
+  btn.disabled = false; btn.textContent = savingText;
+  if (hintId && el(hintId)) el(hintId).textContent = "";
 
   if (okCount === 0) {
     toast("No se pudo guardar: " + (failMsg || "permiso denegado"), "error");

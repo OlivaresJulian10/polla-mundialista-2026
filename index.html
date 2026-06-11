@@ -6,7 +6,7 @@
   <title>Polla Mundialista 2026</title>
   <link rel="icon" type="image/png" href="img/trofeo.png?v=2" />
   <link rel="apple-touch-icon" href="img/trofeo.png?v=2" />
-  <link rel="stylesheet" href="css/styles.css?v=10" />
+  <link rel="stylesheet" href="css/styles.css?v=11" />
 </head>
 <body>
   <header class="topbar">
@@ -18,7 +18,8 @@
       </div>
     </div>
     <nav id="nav" class="nav hidden">
-      <button data-view="matches" class="active">Mis pronósticos</button>
+      <button data-view="today" class="active">Hoy</button>
+      <button data-view="matches">Mis pronósticos</button>
       <button data-view="ranking">Ranking</button>
       <button data-view="admin" id="navAdmin" class="hidden">Admin</button>
     </nav>
@@ -58,6 +59,11 @@
         <p class="auth-note">Usa tu cuenta de Microsoft (Outlook, Hotmail o institucional).</p>
         <p id="authMsg" class="msg"></p>
       </div>
+    </section>
+
+    <!-- ===================== HOY ===================== -->
+    <section id="todayView" class="view hidden">
+      <div id="todayContainer"></div>
     </section>
 
     <!-- ===================== MIS PRONÓSTICOS ===================== -->
@@ -101,6 +107,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="js/app.js?v=12"></script>
+  <script type="module" src="js/app.js?v=13"></script>
 </body>
 </html>
