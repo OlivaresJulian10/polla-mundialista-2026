@@ -1,0 +1,26 @@
+name: Sincronizar resultados del Mundial
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # cada 30 minutos (hora UTC)
+  workflow_dispatch: {}       # botón para ejecutarlo manualmente
+
+# Evita que se solapen dos ejecuciones
+concurrency:
+  group: sync-resultados
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Sincronizar resultados
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SPORTSDB_KEY: ${{ secrets.SPORTSDB_KEY }}
+        run: node scripts/sync-resultados.mjs

@@ -106,4 +106,24 @@ Como es un sitio estático, puedes subirlo a:
 - **Eliminatorias (octavos, cuartos, etc.):** aún no se cargan porque dependen de
   cómo terminen los grupos. Cuando se definan, agrégalas en **matches** con
   `stage` = `r32`, `r16`, `qf`, `sf`, `third` o `final`. Aparecerán solas en la app.
+
+---
+
+## 🤖 Resultados automáticos (opcional)
+
+Un robot de **GitHub Actions** ([.github/workflows/resultados.yml](.github/workflows/resultados.yml))
+consulta cada 30 min los resultados reales en **TheSportsDB** (gratis) y los
+escribe solo en la base de datos. La app recalcula los puntos automáticamente.
+
+**Configuración (una sola vez):**
+1. En Supabase: **Project Settings → API Keys** → copia la clave **`secret`**
+   (empieza por `sb_secret_…`). ⚠️ Es privada, no la compartas.
+2. En GitHub: repo → **Settings → Secrets and variables → Actions →
+   New repository secret**:
+   - Name: `SUPABASE_SERVICE_KEY`
+   - Secret: pega la clave `sb_secret_…`
+3. (Opcional) Para probar ya: pestaña **Actions → "Sincronizar resultados del
+   Mundial" → Run workflow**.
+
+Mientras tanto, también puedes cargar resultados a mano desde la pestaña **Admin**.
 ```
