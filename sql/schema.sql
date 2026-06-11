@@ -65,6 +65,11 @@ create policy "usuario edita su propio perfil"
   on public.profiles for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
 
+-- Seguridad: el usuario solo puede cambiar estas columnas de su perfil
+-- (NO 'is_admin' ni 'id'), para evitar que se haga administrador solo.
+revoke update on public.profiles from authenticated;
+grant  update (display_name, avatar_url) on public.profiles to authenticated;
+
 -- ----- matches -----
 create policy "partidos visibles para autenticados"
   on public.matches for select to authenticated using (true);
