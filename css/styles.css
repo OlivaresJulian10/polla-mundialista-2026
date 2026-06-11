@@ -8,43 +8,24 @@
 body{
   margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   color:var(--text); min-height:100vh; position:relative;
+  /* Césped con franjas de pasto cortado + profundidad en los bordes */
   background:
-    radial-gradient(1100px 760px at 6% -6%, rgba(34,197,94,.50), transparent 52%),
-    radial-gradient(1000px 720px at 96% -2%, rgba(56,189,248,.46), transparent 52%),
-    radial-gradient(950px 800px at 50% 116%, rgba(168,85,247,.40), transparent 52%),
-    radial-gradient(820px 600px at 82% 78%, rgba(251,191,36,.30), transparent 55%),
-    radial-gradient(820px 600px at 14% 82%, rgba(239,68,68,.28), transparent 55%),
-    linear-gradient(160deg, #0e1840 0%, #0c1230 48%, #0a1c16 100%);
+    radial-gradient(140% 110% at 50% 40%, transparent 50%, rgba(0,0,0,.55) 100%),
+    repeating-linear-gradient(90deg, #1c8043 0 8%, #178038 8% 16%);
   background-attachment: fixed;
 }
-/* Capa animada: grandes destellos de color que se desplazan (estadio) */
+/* Líneas del campo de fútbol */
 body::before{
-  content:""; position:fixed; inset:-25%; z-index:-2; pointer-events:none;
-  background:
-    radial-gradient(520px 520px at 22% 28%, rgba(34,197,94,.38), transparent 68%),
-    radial-gradient(580px 580px at 78% 22%, rgba(56,189,248,.34), transparent 68%),
-    radial-gradient(520px 520px at 60% 82%, rgba(251,191,36,.30), transparent 68%),
-    radial-gradient(480px 480px at 30% 75%, rgba(168,85,247,.28), transparent 68%);
-  filter:blur(10px); animation:floatGlow 16s ease-in-out infinite alternate;
+  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background:url("../img/pitch.svg") center center / cover no-repeat;
 }
-/* Capa de confeti de colores + textura sutil */
+/* Luz de estadio (brillo superior suave) */
 body::after{
-  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.55;
-  background-image:
-    radial-gradient(circle, rgba(34,197,94,.55) 0 2.5px, transparent 3px),
-    radial-gradient(circle, rgba(56,189,248,.55) 0 2.5px, transparent 3px),
-    radial-gradient(circle, rgba(251,191,36,.55) 0 2.5px, transparent 3px),
-    radial-gradient(circle, rgba(239,68,68,.5) 0 2.5px, transparent 3px);
-  background-size:150px 150px, 150px 150px, 150px 150px, 150px 150px;
-  background-position:0 0, 75px 38px, 38px 95px, 110px 120px;
-}
-@keyframes floatGlow{
-  0%{transform:translate3d(0,0,0) scale(1)}
-  50%{transform:translate3d(3%,-2.5%,0) scale(1.08)}
-  100%{transform:translate3d(-2.5%,3%,0) scale(1.04)}
-}
-@media (prefers-reduced-motion: reduce){
-  body::before{animation:none}
+  content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+  background:
+    radial-gradient(900px 420px at 50% -10%, rgba(255,255,255,.16), transparent 70%),
+    radial-gradient(700px 380px at 12% 8%, rgba(120,220,160,.18), transparent 70%),
+    radial-gradient(700px 380px at 88% 8%, rgba(120,220,160,.18), transparent 70%);
 }
 .hidden{display:none !important}
 

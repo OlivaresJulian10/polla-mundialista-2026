@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 680" preserveAspectRatio="xMidYMid slice">
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="3">
+    <rect x="22" y="22" width="1006" height="636" rx="4"/>
+    <line x1="525" y1="22" x2="525" y2="658"/>
+    <circle cx="525" cy="340" r="95"/>
+    <!-- Área izquierda -->
+    <rect x="22" y="188" width="165" height="304"/>
+    <rect x="22" y="264" width="56" height="152"/>
+    <path d="M187 270 A 95 95 0 0 1 187 410"/>
+    <!-- Área derecha -->
+    <rect x="863" y="188" width="165" height="304"/>
+    <rect x="972" y="264" width="56" height="152"/>
+    <path d="M863 270 A 95 95 0 0 0 863 410"/>
+    <!-- Esquinas -->
+    <path d="M22 44 A 22 22 0 0 1 44 22"/>
+    <path d="M1006 22 A 22 22 0 0 1 1028 44"/>
+    <path d="M22 636 A 22 22 0 0 0 44 658"/>
+    <path d="M1028 636 A 22 22 0 0 0 1006 658"/>
+  </g>
+  <g fill="#ffffff" fill-opacity="0.30">
+    <circle cx="525" cy="340" r="4.5"/>
+    <circle cx="132" cy="340" r="4.5"/>
+    <circle cx="918" cy="340" r="4.5"/>
+  </g>
+</svg>
