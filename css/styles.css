@@ -137,16 +137,18 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 .save-row .primary{padding:.55rem 1.4rem}
 
 /* Ranking */
+.rank-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px}
 table.rank{width:100%; border-collapse:collapse; background:var(--panel);
   border:1px solid var(--line); border-radius:12px; overflow:hidden}
 table.rank th, table.rank td{padding:.7rem .8rem; text-align:left; border-bottom:1px solid var(--line)}
 table.rank th{font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
-table.rank td.num, table.rank th.num{text-align:center; width:60px}
+table.rank td.num, table.rank th.num{text-align:center; width:56px}
 table.rank tr:last-child td{border-bottom:none}
 table.rank tr.me{background:#13261a}
 .pos{font-weight:800; color:var(--muted)}
 .pos.p1{color:var(--gold)} .pos.p2{color:#cbd5e1} .pos.p3{color:#d4a373}
 .pts-big{font-weight:800; color:var(--primary-2); font-size:1.05rem}
+.rank-legend{font-size:.78rem; margin:.7rem .2rem 0}
 
 /* Toast */
 .toast{
@@ -159,9 +161,48 @@ table.rank tr.me{background:#13261a}
 
 .loading{color:var(--muted); padding:2rem; text-align:center}
 
-@media (max-width:560px){
+/* ===================== MÓVIL ===================== */
+@media (max-width:600px){
+  main{padding:.8rem}
+  .topbar{gap:.5rem .8rem; padding:.6rem .8rem}
   .brand h1{font-size:1rem}
-  .nav{width:100%; order:3; margin:0}
-  .match{grid-template-columns:1fr auto 1fr}
-  .score-input{width:40px}
+  .brand small{font-size:.72rem}
+  .ball{font-size:1.5rem}
+
+  /* Nav: barra propia, repartida y deslizable */
+  .nav{
+    width:100%; order:3; margin:0; justify-content:center;
+    overflow-x:auto; -webkit-overflow-scrolling:touch; gap:.25rem;
+  }
+  .nav button{padding:.45rem .7rem; font-size:.88rem; white-space:nowrap}
+  .user-box{margin-left:auto; font-size:.85rem}
+  .user-box #userName{max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+  /* Partidos: más compactos, nombres que no se cortan feo */
+  .match{padding:.7rem .55rem; gap:.4rem; border-radius:12px}
+  .match .team{gap:.35rem}
+  .match .name{font-size:.82rem; white-space:normal; line-height:1.1}
+  .crest{width:26px; height:26px}
+  .match .flag{font-size:1.3rem}
+  .score-input{width:38px; font-size:1rem; padding:.4rem 0}
+  .match .meta{font-size:.68rem; gap:.3rem; flex-wrap:wrap}
+
+  /* Resumen de puntos */
+  .summary{gap:.6rem 1rem; padding:.85rem 1rem}
+  .sum-num{font-size:1.8rem}
+  .sum-stats{gap:.6rem .9rem; font-size:.82rem; width:100%}
+
+  /* Ranking: oculta columnas secundarias, quedan Pos/Jugador/Pts/Aciertos */
+  .col-opt{display:none}
+  table.rank th, table.rank td{padding:.6rem .5rem}
+  table.rank td.num, table.rank th.num{width:auto}
+
+  .rules{font-size:.82rem; padding:.6rem .8rem}
+  .save-row{position:sticky; bottom:.6rem; z-index:5}
+  .save-row .primary{width:100%; padding:.8rem}
+}
+
+@media (max-width:360px){
+  .match .name{font-size:.76rem}
+  .score-input{width:34px}
 }

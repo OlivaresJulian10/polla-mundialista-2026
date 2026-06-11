@@ -308,23 +308,25 @@ async function loadRanking() {
   if (error) { cont.innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
   if (!data?.length) { cont.innerHTML = '<div class="loading">Aún no hay jugadores.</div>'; return; }
 
-  let html = `<table class="rank"><thead><tr>
+  let html = `<div class="rank-wrap"><table class="rank"><thead><tr>
     <th class="num">#</th><th>Jugador</th>
-    <th class="num">Pts</th><th class="num">Exactos</th><th class="num">Aciertos</th><th class="num">Jugados</th>
+    <th class="num">Pts</th><th class="num">✅</th><th class="num col-opt">🎯</th><th class="num col-opt">Jug.</th>
     </tr></thead><tbody>`;
   data.forEach((row, i) => {
     const me = row.user_id === state.user.id;
     const posClass = i < 3 ? `pos p${i + 1}` : "pos";
+    const medal = i === 0 ? "🥇 " : i === 1 ? "🥈 " : i === 2 ? "🥉 " : "";
     html += `<tr class="${me ? "me" : ""}">
       <td class="num"><span class="${posClass}">${i + 1}</span></td>
-      <td>${row.display_name}${me ? " (tú)" : ""}</td>
+      <td>${medal}${row.display_name}${me ? " (tú)" : ""}</td>
       <td class="num"><span class="pts-big">${row.points}</span></td>
-      <td class="num">${row.exacts}</td>
       <td class="num">${row.hits}</td>
-      <td class="num">${row.played}</td>
+      <td class="num col-opt">${row.exacts}</td>
+      <td class="num col-opt">${row.played}</td>
     </tr>`;
   });
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>
+    <p class="muted rank-legend">✅ aciertos · 🎯 marcadores exactos · Jug. = partidos jugados</p>`;
   cont.innerHTML = html;
 }
 
