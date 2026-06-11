@@ -84,22 +84,27 @@ create policy "solo admin administra partidos"
 create policy "usuario lee sus pronosticos"
   on public.predictions for select to authenticated using (user_id = auth.uid());
 
--- Solo puede crear/editar lo suyo, y SOLO si el partido aún no empezó.
-create policy "usuario crea pronostico antes del inicio"
+-- Permiso de tabla para usuarios autenticados (necesario para guardar)
+grant select, insert, update on public.predictions to authenticated;
+
+-- Solo puede crear/editar lo suyo, y hasta 10 MINUTOS ANTES del partido.
+create policy "usuario crea pronostico hasta 10 min antes"
   on public.predictions for insert to authenticated
   with check (
     user_id = auth.uid()
     and exists (select 1 from public.matches m
-                where m.id = match_id and (m.kickoff is null or m.kickoff > now()))
+                where m.id = match_id and m.kickoff is not null
+                  and now() < m.kickoff - interval '10 minutes')
   );
 
-create policy "usuario edita pronostico antes del inicio"
+create policy "usuario edita pronostico hasta 10 min antes"
   on public.predictions for update to authenticated
   using (user_id = auth.uid())
   with check (
     user_id = auth.uid()
     and exists (select 1 from public.matches m
-                where m.id = match_id and (m.kickoff is null or m.kickoff > now()))
+                where m.id = match_id and m.kickoff is not null
+                  and now() < m.kickoff - interval '10 minutes')
   );
 
 -- =====================================================================

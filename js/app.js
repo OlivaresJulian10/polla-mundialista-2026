@@ -62,7 +62,10 @@ function fmtDate(iso) {
   return txt + " (Col)";
 }
 
-const isLocked = (m) => m.kickoff && new Date(m.kickoff) <= new Date();
+// El pronóstico se cierra 10 minutos ANTES del inicio del partido.
+const LOCK_MINUTES = 10;
+const isLocked = (m) =>
+  m.kickoff && new Date(m.kickoff).getTime() - LOCK_MINUTES * 60000 <= Date.now();
 
 function pointsFor(pred, m) {
   if (!pred || m.home_score == null || m.away_score == null) return null;
@@ -288,7 +291,7 @@ function matchRow(m) {
 
   let right = `<span class="badge"></span>`;
   if (hasResult) right = `<span class="badge result">Final ${m.home_score}–${m.away_score}</span>`;
-  else if (locked) right = `<span class="badge locked">🔒 En juego / jugado</span>`;
+  else if (locked) right = `<span class="badge locked">🔒 Cerrado</span>`;
 
   let ptsBadge = "";
   if (pts != null) ptsBadge = `<span class="badge pts">+${pts} pts</span>`;
@@ -340,7 +343,11 @@ async function saveAllPredictions() {
   const { error } = await sb.from("predictions").upsert(payload, { onConflict: "user_id,match_id" });
   btn.disabled = false; btn.textContent = "Guardar pronósticos";
 
-  if (error) { toast("Error: " + error.message, "error"); return; }
+  if (error) {
+    console.error("Error guardando pronósticos:", error);
+    toast("No se pudo guardar: " + (error.message || error.hint || "permiso denegado"), "error");
+    return;
+  }
   payload.forEach((p) => (state.myPreds[p.match_id] = p));
   el("saveHint").textContent = "";
   toast(`Guardado ✅ (${payload.length} pronósticos)`);
