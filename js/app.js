@@ -3,7 +3,12 @@
 // =====================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { flag } from "./flags.js";
+import { flag, crestUrl } from "./flags.js";
+
+// Escudo (imagen) con respaldo a emoji si no carga
+const crest = (team) =>
+  `<img class="crest" src="${crestUrl(team)}" alt="" title="${team}" loading="lazy"
+        onerror="this.replaceWith(document.createTextNode('${flag(team)}'))" />`;
 
 if (SUPABASE_URL.includes("PEGA_AQUI")) {
   document.body.innerHTML =
@@ -175,6 +180,19 @@ function renderMatches() {
     return;
   }
 
+  // Resumen de puntos del usuario (se calcula solo con los resultados ya cargados)
+  let total = 0, exactos = 0, aciertos = 0, jugados = 0, pronosticados = 0;
+  for (const m of state.matches) {
+    const pred = state.myPreds[m.id];
+    if (pred) pronosticados++;
+    const pts = pointsFor(pred, m);
+    if (pts != null) {
+      jugados++; total += pts;
+      if (pts === 5) exactos++;
+      if (pts > 0) aciertos++;
+    }
+  }
+
   // Agrupar por etapa y, dentro de grupos, por letra
   const byStage = {};
   for (const m of state.matches) {
@@ -182,7 +200,16 @@ function renderMatches() {
     (byStage[key] ||= []).push(m);
   }
 
-  let html = "";
+  let html = `
+    <div class="summary">
+      <div class="sum-main"><span class="sum-num">${total}</span><span class="sum-lbl">puntos</span></div>
+      <div class="sum-stats">
+        <span>🎯 <b>${exactos}</b> exactos</span>
+        <span>✅ <b>${aciertos}</b> aciertos</span>
+        <span>🏁 <b>${jugados}</b> jugados</span>
+        <span>📝 <b>${pronosticados}</b> pronosticados</span>
+      </div>
+    </div>`;
   for (const key of Object.keys(byStage)) {
     const [stage, letter] = key.split(":");
     const title = stage === "group" ? `Grupo ${letter}` : STAGE_LABELS[stage] || stage;
@@ -220,7 +247,7 @@ function matchRow(m) {
 
   return `
   <div class="match">
-    <div class="team home"><span class="name">${m.home_team}</span><span class="flag">${flag(m.home_team)}</span></div>
+    <div class="team home"><span class="name">${m.home_team}</span><span class="flag">${crest(m.home_team)}</span></div>
     <div class="scores">
       <input class="score-input" type="number" min="0" max="99" inputmode="numeric"
              data-mid="${m.id}" data-side="home" value="${ph}" ${locked ? "disabled" : ""} />
@@ -228,7 +255,7 @@ function matchRow(m) {
       <input class="score-input" type="number" min="0" max="99" inputmode="numeric"
              data-mid="${m.id}" data-side="away" value="${pa}" ${locked ? "disabled" : ""} />
     </div>
-    <div class="team away"><span class="flag">${flag(m.away_team)}</span><span class="name">${m.away_team}</span></div>
+    <div class="team away"><span class="flag">${crest(m.away_team)}</span><span class="name">${m.away_team}</span></div>
     <div class="meta">
       <span>🕒 ${fmtDate(m.kickoff)}</span>
       <span>${ptsBadge} ${right}</span>
@@ -322,7 +349,7 @@ function renderAdmin() {
     for (const m of byStage[key]) {
       html += `
       <div class="match">
-        <div class="team home"><span class="name">${m.home_team}</span><span class="flag">${flag(m.home_team)}</span></div>
+        <div class="team home"><span class="name">${m.home_team}</span><span class="flag">${crest(m.home_team)}</span></div>
         <div class="scores">
           <input class="score-input" type="number" min="0" max="99" data-mid="${m.id}" data-side="home"
                  value="${m.home_score ?? ""}" />
@@ -330,7 +357,7 @@ function renderAdmin() {
           <input class="score-input" type="number" min="0" max="99" data-mid="${m.id}" data-side="away"
                  value="${m.away_score ?? ""}" />
         </div>
-        <div class="team away"><span class="flag">${flag(m.away_team)}</span><span class="name">${m.away_team}</span></div>
+        <div class="team away"><span class="flag">${crest(m.away_team)}</span><span class="name">${m.away_team}</span></div>
         <div class="meta"><span>🕒 ${fmtDate(m.kickoff)}</span>
           <button class="ghost" data-save="${m.id}">Guardar resultado</button></div>
       </div>`;
