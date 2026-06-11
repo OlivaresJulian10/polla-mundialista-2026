@@ -1,65 +1,94 @@
 -- =====================================================================
---  POLLA MUNDIALISTA 2026 — Carga de grupos y partidos (fase de grupos)
---  Ejecuta este archivo DESPUÉS de schema.sql.
+--  POLLA MUNDIALISTA 2026 — Calendario REAL de la fase de grupos
+--  Fechas y emparejamientos oficiales. Horas en HORA COLOMBIA (UTC-5).
+--  (Conversión: hora del Este de EE.UU. en junio − 1 hora = hora Colombia.)
+--  Fuente: calendario oficial Mundial 2026 (ESPN / FIFA).
 --
---  Grupos según el Sorteo Final (Washington D.C., 5 de diciembre de 2025).
---  >>> VERIFICA los equipos contra la fuente oficial y corrígelos si hace
---      falta desde el panel de Admin de la app.
---
---  Las fechas (kickoff) son TENTATIVAS para que funcione el bloqueo;
---  ajústalas con las horas reales desde el panel de Admin.
+--  Ejecuta este archivo en SQL Editor DESPUÉS de schema.sql.
+--  OJO: borra y recarga los partidos (y por tanto los pronósticos previos).
+--       Hazlo ahora que aún no hay pronósticos reales.
 -- =====================================================================
 
--- Limpia partidos previos (no toca pronósticos de usuarios si re-cargas
--- antes de que alguien juegue; si ya hay pronósticos, el ON DELETE CASCADE
--- los borraría — re-carga solo en pruebas).
 truncate table public.matches restart identity cascade;
 
-do $$
-declare
-  g    record;
-  base timestamptz := timestamptz '2026-06-11 12:00:00-05';  -- inicio tentativo
-  step interval    := interval '3 hour';
-  i    int := 0;
-begin
-  for g in
-    select group_letter,
-           max(team) filter (where pos = 1) as t1,
-           max(team) filter (where pos = 2) as t2,
-           max(team) filter (where pos = 3) as t3,
-           max(team) filter (where pos = 4) as t4
-    from (values
-      ('A',1,'México'),       ('A',2,'Sudáfrica'),   ('A',3,'Corea del Sur'), ('A',4,'Chequia'),
-      ('B',1,'Canadá'),       ('B',2,'Suiza'),       ('B',3,'Bosnia y Herzegovina'), ('B',4,'Catar'),
-      ('C',1,'Brasil'),       ('C',2,'Escocia'),     ('C',3,'Marruecos'),     ('C',4,'Haití'),
-      ('D',1,'Estados Unidos'),('D',2,'Turquía'),    ('D',3,'Paraguay'),      ('D',4,'Australia'),
-      ('E',1,'Alemania'),     ('E',2,'Costa de Marfil'),('E',3,'Ecuador'),    ('E',4,'Curazao'),
-      ('F',1,'Países Bajos'), ('F',2,'Suecia'),      ('F',3,'Japón'),         ('F',4,'Túnez'),
-      ('G',1,'Bélgica'),      ('G',2,'Irán'),        ('G',3,'Egipto'),        ('G',4,'Nueva Zelanda'),
-      ('H',1,'España'),       ('H',2,'Arabia Saudita'),('H',3,'Uruguay'),     ('H',4,'Cabo Verde'),
-      ('I',1,'Francia'),      ('I',2,'Irak'),        ('I',3,'Noruega'),       ('I',4,'Senegal'),
-      ('J',1,'Argentina'),    ('J',2,'Austria'),     ('J',3,'Jordania'),      ('J',4,'Argelia'),
-      ('K',1,'Portugal'),     ('K',2,'Colombia'),    ('K',3,'Uzbekistán'),    ('K',4,'RD Congo'),
-      ('L',1,'Inglaterra'),   ('L',2,'Croacia'),     ('L',3,'Ghana'),         ('L',4,'Panamá')
-    ) as v(group_letter, pos, team)
-    group by group_letter
-    order by group_letter
-  loop
-    -- 6 partidos por grupo (todos contra todos)
-    insert into public.matches (stage, group_letter, home_team, away_team, kickoff) values
-      ('group', g.group_letter, g.t1, g.t2, base + (i+0) * step),
-      ('group', g.group_letter, g.t3, g.t4, base + (i+1) * step),
-      ('group', g.group_letter, g.t1, g.t3, base + (i+2) * step),
-      ('group', g.group_letter, g.t4, g.t2, base + (i+3) * step),
-      ('group', g.group_letter, g.t1, g.t4, base + (i+4) * step),
-      ('group', g.group_letter, g.t2, g.t3, base + (i+5) * step);
-    i := i + 6;
-  end loop;
-end $$;
+insert into public.matches (stage, group_letter, home_team, away_team, kickoff) values
+-- ===== Jornada 1 =====
+('group','A','México','Sudáfrica',                 '2026-06-11 14:00-05'),
+('group','A','Corea del Sur','Chequia',            '2026-06-11 21:00-05'),
+('group','B','Canadá','Bosnia y Herzegovina',      '2026-06-12 14:00-05'),
+('group','D','Estados Unidos','Paraguay',          '2026-06-12 20:00-05'),
+('group','B','Catar','Suiza',                      '2026-06-13 14:00-05'),
+('group','C','Brasil','Marruecos',                 '2026-06-13 17:00-05'),
+('group','C','Haití','Escocia',                    '2026-06-13 20:00-05'),
+('group','D','Australia','Turquía',                '2026-06-13 23:00-05'),
+('group','E','Alemania','Curazao',                 '2026-06-14 12:00-05'),
+('group','F','Países Bajos','Japón',               '2026-06-14 15:00-05'),
+('group','E','Costa de Marfil','Ecuador',          '2026-06-14 18:00-05'),
+('group','F','Suecia','Túnez',                     '2026-06-14 21:00-05'),
+('group','H','España','Cabo Verde',                '2026-06-15 12:00-05'),
+('group','G','Bélgica','Egipto',                   '2026-06-15 17:00-05'),
+('group','H','Arabia Saudita','Uruguay',           '2026-06-15 17:00-05'),
+('group','G','Irán','Nueva Zelanda',               '2026-06-15 23:00-05'),
+('group','I','Francia','Senegal',                  '2026-06-16 14:00-05'),
+('group','I','Irak','Noruega',                     '2026-06-16 17:00-05'),
+('group','J','Argentina','Argelia',                '2026-06-16 20:00-05'),
+('group','J','Austria','Jordania',                 '2026-06-16 23:00-05'),
+('group','K','Portugal','RD Congo',                '2026-06-17 12:00-05'),
+('group','L','Inglaterra','Croacia',               '2026-06-17 15:00-05'),
+('group','L','Ghana','Panamá',                     '2026-06-17 18:00-05'),
+('group','K','Uzbekistán','Colombia',              '2026-06-17 21:00-05'),
+-- ===== Jornada 2 =====
+('group','A','Chequia','Sudáfrica',                '2026-06-18 11:00-05'),
+('group','B','Suiza','Bosnia y Herzegovina',       '2026-06-18 14:00-05'),
+('group','B','Canadá','Catar',                     '2026-06-18 17:00-05'),
+('group','A','México','Corea del Sur',             '2026-06-18 22:00-05'),
+('group','D','Estados Unidos','Australia',         '2026-06-19 14:00-05'),
+('group','C','Escocia','Marruecos',                '2026-06-19 17:00-05'),
+('group','C','Brasil','Haití',                     '2026-06-19 20:00-05'),
+('group','D','Turquía','Paraguay',                 '2026-06-19 23:00-05'),
+('group','F','Países Bajos','Suecia',              '2026-06-20 12:00-05'),
+('group','E','Alemania','Costa de Marfil',         '2026-06-20 15:00-05'),
+('group','E','Ecuador','Curazao',                  '2026-06-20 19:00-05'),
+('group','F','Túnez','Japón',                      '2026-06-20 23:00-05'),
+('group','H','España','Arabia Saudita',            '2026-06-21 11:00-05'),
+('group','G','Bélgica','Irán',                     '2026-06-21 14:00-05'),
+('group','H','Uruguay','Cabo Verde',               '2026-06-21 17:00-05'),
+('group','G','Nueva Zelanda','Egipto',             '2026-06-21 20:00-05'),
+('group','J','Argentina','Austria',                '2026-06-22 12:00-05'),
+('group','I','Francia','Irak',                     '2026-06-22 16:00-05'),
+('group','I','Noruega','Senegal',                  '2026-06-22 19:00-05'),
+('group','J','Jordania','Argelia',                 '2026-06-22 22:00-05'),
+('group','K','Portugal','Uzbekistán',              '2026-06-23 12:00-05'),
+('group','L','Inglaterra','Ghana',                 '2026-06-23 15:00-05'),
+('group','L','Panamá','Croacia',                   '2026-06-23 18:00-05'),
+('group','K','Colombia','RD Congo',                '2026-06-23 21:00-05'),
+-- ===== Jornada 3 (partidos simultáneos) =====
+('group','B','Suiza','Canadá',                     '2026-06-24 14:00-05'),
+('group','B','Bosnia y Herzegovina','Catar',       '2026-06-24 14:00-05'),
+('group','C','Escocia','Brasil',                   '2026-06-24 17:00-05'),
+('group','C','Marruecos','Haití',                  '2026-06-24 17:00-05'),
+('group','A','Chequia','México',                   '2026-06-24 20:00-05'),
+('group','A','Sudáfrica','Corea del Sur',          '2026-06-24 20:00-05'),
+('group','E','Ecuador','Alemania',                 '2026-06-25 15:00-05'),
+('group','E','Curazao','Costa de Marfil',          '2026-06-25 15:00-05'),
+('group','F','Japón','Suecia',                     '2026-06-25 18:00-05'),
+('group','F','Túnez','Países Bajos',               '2026-06-25 18:00-05'),
+('group','D','Turquía','Estados Unidos',           '2026-06-25 21:00-05'),
+('group','D','Paraguay','Australia',               '2026-06-25 21:00-05'),
+('group','I','Noruega','Francia',                  '2026-06-26 14:00-05'),
+('group','I','Senegal','Irak',                     '2026-06-26 14:00-05'),
+('group','H','Cabo Verde','Arabia Saudita',        '2026-06-26 19:00-05'),
+('group','H','Uruguay','España',                   '2026-06-26 19:00-05'),
+('group','G','Egipto','Irán',                      '2026-06-26 22:00-05'),
+('group','G','Nueva Zelanda','Bélgica',            '2026-06-26 22:00-05'),
+('group','L','Panamá','Inglaterra',                '2026-06-27 16:00-05'),
+('group','L','Croacia','Ghana',                    '2026-06-27 16:00-05'),
+('group','K','Colombia','Portugal',                '2026-06-27 18:30-05'),
+('group','K','RD Congo','Uzbekistán',              '2026-06-27 18:30-05'),
+('group','J','Argelia','Austria',                  '2026-06-27 21:00-05'),
+('group','J','Jordania','Argentina',               '2026-06-27 21:00-05');
 
--- Verifica:
+-- Verifica (debe dar 72 y 6 por grupo):
 select group_letter, count(*) as partidos
-from public.matches
-where stage = 'group'
-group by group_letter
-order by group_letter;
+from public.matches where stage='group'
+group by group_letter order by group_letter;
