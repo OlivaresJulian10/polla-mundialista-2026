@@ -7,8 +7,8 @@
 //   la base está protegida por Row Level Security.)
 // =====================================================================
 
-export const SUPABASE_URL = "PEGA_AQUI_TU_PROJECT_URL";
-export const SUPABASE_ANON_KEY = "PEGA_AQUI_TU_ANON_KEY";
+export const SUPABASE_URL = "https://ucaalcrdujucpdnmxjsd.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_RT-DMrXbbFDDXnNCXBtZwQ_-5AthA5k";
 
 // Reglas de puntaje (solo informativo en la interfaz; el cálculo real
 // está en la función get_leaderboard de la base de datos).
