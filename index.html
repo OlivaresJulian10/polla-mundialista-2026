@@ -28,37 +28,24 @@
 
   <main id="app">
 
-    <!-- ===================== LOGIN / REGISTRO ===================== -->
+    <!-- ===================== LOGIN (solo Microsoft) ===================== -->
     <section id="authView" class="view auth">
-      <div class="card">
-        <div class="tabs">
-          <button id="tabLogin" class="tab active">Iniciar sesión</button>
-          <button id="tabSignup" class="tab">Crear cuenta</button>
-        </div>
+      <div class="card auth-card">
+        <div class="auth-ball">⚽</div>
+        <h2 class="auth-title">Polla Mundialista 2026</h2>
+        <p class="auth-sub">Pronostica todos los partidos del Mundial y compite con tus amigos por el primer lugar.</p>
 
-        <form id="loginForm" class="form">
-          <label>Correo
-            <input type="email" id="loginEmail" required autocomplete="email" />
-          </label>
-          <label>Contraseña
-            <input type="password" id="loginPass" required autocomplete="current-password" />
-          </label>
-          <button type="submit" class="primary">Entrar</button>
-        </form>
+        <button id="msLoginBtn" class="ms-btn">
+          <svg width="20" height="20" viewBox="0 0 21 21" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+          </svg>
+          Continuar con Microsoft
+        </button>
 
-        <form id="signupForm" class="form hidden">
-          <label>Nombre para mostrar
-            <input type="text" id="signupName" required maxlength="40" placeholder="Ej: Julián O." />
-          </label>
-          <label>Correo
-            <input type="email" id="signupEmail" required autocomplete="email" />
-          </label>
-          <label>Contraseña (mín. 6 caracteres)
-            <input type="password" id="signupPass" required minlength="6" autocomplete="new-password" />
-          </label>
-          <button type="submit" class="primary">Crear cuenta</button>
-        </form>
-
+        <p class="auth-note">Usa tu cuenta de Microsoft (Outlook, Hotmail o institucional).</p>
         <p id="authMsg" class="msg"></p>
       </div>
     </section>

@@ -3,6 +3,7 @@
 // =====================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
+import { flag } from "./flags.js";
 
 if (SUPABASE_URL.includes("PEGA_AQUI")) {
   document.body.innerHTML =
@@ -48,10 +49,12 @@ function toast(text, kind = "ok") {
 function fmtDate(iso) {
   if (!iso) return "Fecha por confirmar";
   const d = new Date(iso);
-  return d.toLocaleString("es", {
+  const txt = d.toLocaleString("es-CO", {
     weekday: "short", day: "2-digit", month: "short",
-    hour: "2-digit", minute: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+    timeZone: "America/Bogota",
   });
+  return txt + " (Col)";
 }
 
 const isLocked = (m) => m.kickoff && new Date(m.kickoff) <= new Date();
@@ -73,40 +76,16 @@ function showAuthMsg(text, kind = "") {
   m.className = "msg " + kind;
 }
 
-el("tabLogin").onclick = () => switchAuthTab("login");
-el("tabSignup").onclick = () => switchAuthTab("signup");
-function switchAuthTab(which) {
-  const login = which === "login";
-  el("tabLogin").classList.toggle("active", login);
-  el("tabSignup").classList.toggle("active", !login);
-  el("loginForm").classList.toggle("hidden", !login);
-  el("signupForm").classList.toggle("hidden", login);
-  showAuthMsg("");
-}
-
-el("loginForm").onsubmit = async (e) => {
-  e.preventDefault();
-  showAuthMsg("Entrando...");
-  const { error } = await sb.auth.signInWithPassword({
-    email: el("loginEmail").value.trim(),
-    password: el("loginPass").value,
+el("msLoginBtn").onclick = async () => {
+  showAuthMsg("Redirigiendo a Microsoft…");
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: "azure",
+    options: {
+      scopes: "openid email profile",
+      redirectTo: window.location.origin + window.location.pathname,
+    },
   });
-  if (error) return showAuthMsg(traducirError(error.message), "error");
-  // onAuthStateChange se encarga del resto
-};
-
-el("signupForm").onsubmit = async (e) => {
-  e.preventDefault();
-  showAuthMsg("Creando cuenta...");
-  const { data, error } = await sb.auth.signUp({
-    email: el("signupEmail").value.trim(),
-    password: el("signupPass").value,
-    options: { data: { display_name: el("signupName").value.trim() } },
-  });
-  if (error) return showAuthMsg(traducirError(error.message), "error");
-  if (data.session) return; // ya quedó logueado
-  showAuthMsg("✅ Cuenta creada. Revisa tu correo si pide confirmación, luego inicia sesión.", "ok");
-  switchAuthTab("login");
+  if (error) showAuthMsg(traducirError(error.message), "error");
 };
 
 el("logoutBtn").onclick = async () => {
@@ -116,10 +95,10 @@ el("logoutBtn").onclick = async () => {
 
 function traducirError(msg = "") {
   const m = msg.toLowerCase();
-  if (m.includes("invalid login")) return "Correo o contraseña incorrectos.";
-  if (m.includes("already registered")) return "Ese correo ya tiene cuenta.";
-  if (m.includes("email not confirmed")) return "Debes confirmar tu correo antes de entrar.";
-  if (m.includes("password")) return "La contraseña debe tener al menos 6 caracteres.";
+  if (m.includes("provider is not enabled"))
+    return "El acceso con Microsoft aún no está activado en Supabase (Authentication → Providers → Azure).";
+  if (m.includes("redirect"))
+    return "Falta autorizar la URL del sitio en Supabase (Authentication → URL Configuration).";
   return msg;
 }
 
@@ -241,7 +220,7 @@ function matchRow(m) {
 
   return `
   <div class="match">
-    <div class="team home"><span class="name">${m.home_team}</span></div>
+    <div class="team home"><span class="name">${m.home_team}</span><span class="flag">${flag(m.home_team)}</span></div>
     <div class="scores">
       <input class="score-input" type="number" min="0" max="99" inputmode="numeric"
              data-mid="${m.id}" data-side="home" value="${ph}" ${locked ? "disabled" : ""} />
@@ -249,9 +228,9 @@ function matchRow(m) {
       <input class="score-input" type="number" min="0" max="99" inputmode="numeric"
              data-mid="${m.id}" data-side="away" value="${pa}" ${locked ? "disabled" : ""} />
     </div>
-    <div class="team away"><span class="name">${m.away_team}</span></div>
+    <div class="team away"><span class="flag">${flag(m.away_team)}</span><span class="name">${m.away_team}</span></div>
     <div class="meta">
-      <span>${fmtDate(m.kickoff)}</span>
+      <span>🕒 ${fmtDate(m.kickoff)}</span>
       <span>${ptsBadge} ${right}</span>
     </div>
   </div>`;
@@ -343,7 +322,7 @@ function renderAdmin() {
     for (const m of byStage[key]) {
       html += `
       <div class="match">
-        <div class="team home"><span class="name">${m.home_team}</span></div>
+        <div class="team home"><span class="name">${m.home_team}</span><span class="flag">${flag(m.home_team)}</span></div>
         <div class="scores">
           <input class="score-input" type="number" min="0" max="99" data-mid="${m.id}" data-side="home"
                  value="${m.home_score ?? ""}" />
@@ -351,8 +330,8 @@ function renderAdmin() {
           <input class="score-input" type="number" min="0" max="99" data-mid="${m.id}" data-side="away"
                  value="${m.away_score ?? ""}" />
         </div>
-        <div class="team away"><span class="name">${m.away_team}</span></div>
-        <div class="meta"><span>${fmtDate(m.kickoff)}</span>
+        <div class="team away"><span class="flag">${flag(m.away_team)}</span><span class="name">${m.away_team}</span></div>
+        <div class="meta"><span>🕒 ${fmtDate(m.kickoff)}</span>
           <button class="ghost" data-save="${m.id}">Guardar resultado</button></div>
       </div>`;
     }
