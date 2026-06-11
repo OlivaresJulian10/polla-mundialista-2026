@@ -160,7 +160,7 @@ async function start(user) {
   renderHeaderAvatar();
 
   await loadMatchesAndPreds();
-  showView("today");
+  showView("matches");
 }
 
 // =====================================================================
