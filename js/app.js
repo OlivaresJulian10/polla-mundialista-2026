@@ -315,42 +315,61 @@ function matchRow(m) {
 }
 
 async function saveAllPredictions() {
-  const rows = [];
-  document.querySelectorAll(".score-input:not(:disabled)").forEach((inp) => {
+  // Recolectar los dos marcadores de cada partido
+  const byMatch = {};
+  document.querySelectorAll(".score-input").forEach((inp) => {
     const mid = Number(inp.dataset.mid);
-    const side = inp.dataset.side;
-    const val = inp.value === "" ? null : Number(inp.value);
-    let r = rows.find((x) => x.match_id === mid);
-    if (!r) { r = { match_id: mid, home: null, away: null }; rows.push(r); }
-    r[side] = val;
+    (byMatch[mid] ||= {})[inp.dataset.side] = inp.value === "" ? null : Number(inp.value);
   });
 
-  // Solo enviar partidos con AMBOS marcadores llenos
-  const payload = rows
-    .filter((r) => r.home != null && r.away != null)
-    .map((r) => ({
-      user_id: state.user.id,
-      match_id: r.match_id,
-      pred_home: r.home,
-      pred_away: r.away,
-      updated_at: new Date().toISOString(),
-    }));
+  // Solo partidos con AMBOS marcadores y que NO estén cerrados (revalida la hora ahora)
+  const payload = [];
+  let omitidosCerrados = 0;
+  for (const midStr of Object.keys(byMatch)) {
+    const mid = Number(midStr);
+    const r = byMatch[mid];
+    if (r.home == null || r.away == null) continue; // incompleto: no lo mando
+    const m = state.matches.find((x) => x.id === mid);
+    if (m && isLocked(m)) { omitidosCerrados++; continue; } // ya cerró: lo omito
+    payload.push({
+      user_id: state.user.id, match_id: mid,
+      pred_home: r.home, pred_away: r.away, updated_at: new Date().toISOString(),
+    });
+  }
 
-  if (!payload.length) return toast("Escribe al menos un marcador completo", "error");
+  if (!payload.length) {
+    return toast(omitidosCerrados ? "Esos partidos ya están cerrados" : "Escribe al menos un marcador completo", "error");
+  }
 
   const btn = el("saveAllBtn");
   btn.disabled = true; btn.textContent = "Guardando...";
-  const { error } = await sb.from("predictions").upsert(payload, { onConflict: "user_id,match_id" });
-  btn.disabled = false; btn.textContent = "Guardar pronósticos";
 
-  if (error) {
-    console.error("Error guardando pronósticos:", error);
-    toast("No se pudo guardar: " + (error.message || error.hint || "permiso denegado"), "error");
-    return;
+  // Intento en lote; si falla, guardo uno por uno para no perder los válidos
+  let okCount = 0, failMsg = "";
+  const { error } = await sb.from("predictions").upsert(payload, { onConflict: "user_id,match_id" });
+  if (!error) {
+    okCount = payload.length;
+    payload.forEach((p) => (state.myPreds[p.match_id] = p));
+  } else {
+    console.error("Lote falló, guardando uno por uno:", error);
+    for (const row of payload) {
+      const res = await sb.from("predictions").upsert(row, { onConflict: "user_id,match_id" });
+      if (res.error) { failMsg = res.error.message; console.error("Fallo partido", row.match_id, res.error); }
+      else { okCount++; state.myPreds[row.match_id] = row; }
+    }
   }
-  payload.forEach((p) => (state.myPreds[p.match_id] = p));
+
+  btn.disabled = false; btn.textContent = "Guardar pronósticos";
   el("saveHint").textContent = "";
-  toast(`Guardado ✅ (${payload.length} pronósticos)`);
+
+  if (okCount === 0) {
+    toast("No se pudo guardar: " + (failMsg || "permiso denegado"), "error");
+  } else {
+    let msg = `Guardado ✅ (${okCount})`;
+    if (omitidosCerrados) msg += ` · ${omitidosCerrados} ya cerrados`;
+    if (okCount < payload.length) msg += ` · ${payload.length - okCount} fallaron`;
+    toast(msg);
+  }
 }
 
 // =====================================================================
