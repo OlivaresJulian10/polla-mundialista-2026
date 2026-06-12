@@ -241,6 +241,22 @@ table.rank tr.me{background:#13261a}
 .pred-teams .crest{width:20px; height:20px}
 .pred-teams b{color:var(--primary-2)}
 
+/* Modal editable (admin corrige pronósticos) */
+.modal-note{margin:.2rem 0 .8rem}
+.pred-edit{
+  display:grid; grid-template-columns:1fr 44px 12px 44px 1fr; align-items:center;
+  gap:.3rem; padding:.45rem 0; border-bottom:1px solid var(--line); font-size:.85rem;
+}
+.pred-edit:last-of-type{border-bottom:none}
+.pe-home{display:flex; align-items:center; justify-content:flex-end; gap:.3rem; text-align:right; min-width:0}
+.pe-away{display:flex; align-items:center; gap:.3rem; min-width:0}
+.pe-home .name, .pe-away .name{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pred-edit .crest{width:20px; height:20px}
+.pe-in{width:44px; height:38px; font-size:1rem}
+.pe-meta{grid-column:1 / -1; text-align:center; display:flex; gap:.4rem; justify-content:center; flex-wrap:wrap}
+.modal-foot{position:sticky; bottom:0; background:var(--panel); padding:.7rem 0 .2rem; margin-top:.5rem; border-top:1px solid var(--line)}
+.modal-foot .primary{width:100%}
+
 /* ===== TABLET / iPad / ESCRITORIO: partidos en 2 columnas ===== */
 @media (min-width:760px){
   main{max-width:980px}

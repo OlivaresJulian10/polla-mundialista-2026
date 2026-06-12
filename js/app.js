@@ -551,28 +551,59 @@ async function loadParticipation() {
   });
 }
 
+let modalUser = null;
 async function viewUserPredictions(uid, name) {
+  modalUser = uid;
   el("modalTitle").textContent = "Pronósticos de " + name;
   el("modalBody").innerHTML = '<div class="loading">Cargando…</div>';
   el("modal").classList.remove("hidden");
 
   const { data, error } = await sb.rpc("admin_user_predictions", { p_user: uid });
   if (error) { el("modalBody").innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
-  if (!data?.length) { el("modalBody").innerHTML = '<div class="loading">Sin pronósticos.</div>'; return; }
+  if (!data?.length) { el("modalBody").innerHTML = '<div class="loading">No hay partidos.</div>'; return; }
 
-  let html = "";
+  let html = `<p class="muted modal-note">Llena o corrige los pronósticos de este jugador (puedes hacerlo aunque el partido ya esté cerrado). Deja vacío para no cambiar.</p>`;
   for (const r of data) {
     const played = r.home_score != null && r.away_score != null;
-    const pred = { pred_home: r.pred_home, pred_away: r.pred_away };
-    const pts = played ? pointsFor(pred, { home_score: r.home_score, away_score: r.away_score }) : null;
+    const pred = r.pred_home != null ? { pred_home: r.pred_home, pred_away: r.pred_away } : null;
+    const pts = played && pred ? pointsFor(pred, { home_score: r.home_score, away_score: r.away_score }) : null;
+    const realTxt = played ? `<span class="badge result">real ${r.home_score}–${r.away_score}</span>` : "";
     const ptsTxt = pts != null ? `<span class="badge pts">+${pts}</span>` : "";
-    const realTxt = played ? `<span class="muted"> · real ${r.home_score}–${r.away_score}</span>` : "";
-    html += `<div class="pred-row">
-      <span class="pred-teams">${crest(r.home_team)} ${r.home_team} <b>${r.pred_home}–${r.pred_away}</b> ${r.away_team} ${crest(r.away_team)}</span>
-      <span>${ptsTxt}${realTxt}</span>
+    html += `<div class="pred-edit">
+      <span class="pe-home"><span class="name">${r.home_team}</span>${crest(r.home_team)}</span>
+      <input class="score-input pe-in" type="number" min="0" max="99" data-mid="${r.match_id}" data-side="home" value="${r.pred_home ?? ""}" />
+      <span class="vs">-</span>
+      <input class="score-input pe-in" type="number" min="0" max="99" data-mid="${r.match_id}" data-side="away" value="${r.pred_away ?? ""}" />
+      <span class="pe-away">${crest(r.away_team)}<span class="name">${r.away_team}</span></span>
+      <span class="pe-meta">${realTxt}${ptsTxt}</span>
     </div>`;
   }
+  html += `<div class="modal-foot"><button class="primary" id="saveUserPredsBtn">Guardar pronósticos de ${name}</button></div>`;
   el("modalBody").innerHTML = html;
+  el("saveUserPredsBtn").onclick = saveUserPredictions;
+}
+
+async function saveUserPredictions() {
+  const byMatch = {};
+  el("modalBody").querySelectorAll(".pe-in").forEach((inp) => {
+    const mid = Number(inp.dataset.mid);
+    (byMatch[mid] ||= {})[inp.dataset.side] = inp.value === "" ? null : Number(inp.value);
+  });
+  // Solo enviar los que tengan AMBOS marcadores (para llenar/corregir)
+  const rows = Object.keys(byMatch)
+    .map((mid) => ({ match_id: Number(mid), home: byMatch[mid].home, away: byMatch[mid].away }))
+    .filter((r) => r.home != null && r.away != null);
+
+  if (!rows.length) return toast("Escribe al menos un marcador completo", "error");
+
+  const btn = el("saveUserPredsBtn");
+  btn.disabled = true; btn.textContent = "Guardando...";
+  const { error } = await sb.rpc("admin_set_predictions", { p_user: modalUser, p_data: rows });
+  btn.disabled = false; btn.textContent = "Guardar pronósticos";
+
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast(`Guardado ✅ (${rows.length} pronósticos)`);
+  loadParticipation();
 }
 
 el("modalClose").onclick = () => el("modal").classList.add("hidden");
