@@ -117,17 +117,26 @@ function traducirError(msg = "") {
 // =====================================================================
 //  Navegación entre vistas
 // =====================================================================
-const VIEWS = ["today", "matches", "ranking", "admin"];
+const VIEWS = ["today", "weekend", "matches", "ranking", "admin"];
 function showView(name) {
   VIEWS.forEach((v) => el(v + "View").classList.toggle("hidden", v !== name));
   document.querySelectorAll("#nav button").forEach((b) =>
     b.classList.toggle("active", b.dataset.view === name)
   );
+  setHeaderH();
   if (name === "today") renderToday();
+  if (name === "weekend") renderWeekend();
   if (name === "matches") renderMatches();
   if (name === "ranking") loadRanking();
   if (name === "admin") renderAdmin();
 }
+
+// Mide la altura del encabezado para anclar la barra de guardado debajo
+function setHeaderH() {
+  const bar = document.querySelector(".topbar");
+  if (bar) document.documentElement.style.setProperty("--header-h", bar.offsetHeight + 6 + "px");
+}
+window.addEventListener("resize", setHeaderH);
 document.querySelectorAll("#nav button").forEach((b) => {
   b.onclick = () => showView(b.dataset.view);
 });
@@ -257,7 +266,8 @@ function renderMatches() {
     (byStage[key] ||= []).push(m);
   }
 
-  let html = `
+  let html = saveBar("saveAllBtn", "saveHint");
+  html += `
     <div class="summary">
       <div class="sum-main"><span class="sum-num">${total}</span><span class="sum-lbl">puntos</span></div>
       <div class="sum-stats">
@@ -274,17 +284,25 @@ function renderMatches() {
     for (const m of byStage[key]) html += matchRow(m);
     html += `</div>`;
   }
-  html += `<div class="save-row"><button class="primary" id="saveAllBtn">Guardar pronósticos</button>
-           <span class="muted" id="saveHint"></span></div>`;
   cont.innerHTML = html;
+  wireSave(cont, "saveAllBtn", "saveHint");
+}
 
+// Barra de guardado fija (se queda arriba al hacer scroll)
+function saveBar(btnId, hintId) {
+  return `<div class="save-bar">
+    <button class="primary" id="${btnId}">💾 Guardar pronósticos</button>
+    <span class="save-hint" id="${hintId}"></span>
+  </div>`;
+}
+function wireSave(cont, btnId, hintId) {
   cont.querySelectorAll(".score-input").forEach((inp) => {
     inp.addEventListener("input", () => {
-      el("saveHint").textContent = "Tienes cambios sin guardar…";
+      const h = el(hintId); if (h) h.textContent = "Cambios sin guardar…";
     });
   });
-  el("saveAllBtn").onclick = () =>
-    saveAllPredictions(el("matchesContainer"), el("saveAllBtn"), "saveHint");
+  const btn = el(btnId);
+  if (btn) btn.onclick = () => saveAllPredictions(cont, btn, hintId);
 }
 
 // =====================================================================
@@ -333,22 +351,68 @@ function renderToday() {
       </div>`;
   }
 
-  let html = encabezado;
+  let html = lista.length ? saveBar("saveTodayBtn", "saveHintToday") : "";
+  html += encabezado;
   for (const m of lista) html += matchRow(m);
-  if (lista.length) {
-    html += `<div class="save-row">
-      <button class="primary" id="saveTodayBtn">Guardar pronósticos</button>
-      <span class="muted" id="saveHintToday"></span></div>`;
+  cont.innerHTML = html;
+  wireSave(cont, "saveTodayBtn", "saveHintToday");
+}
+
+// =====================================================================
+//  Vista: FIN DE SEMANA (sábado y domingo)
+// =====================================================================
+function renderWeekend() {
+  const cont = el("weekendContainer");
+  if (!state.matches.length) {
+    cont.innerHTML = '<div class="loading">Aún no hay partidos cargados.</div>';
+    return;
+  }
+
+  // Fechas (YYYY-MM-DD, hora Colombia) del sábado y domingo de este fin de semana
+  const bog = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+  const dow = bog.getDay(); // 0=Dom .. 6=Sáb
+  const satOffset = dow === 0 ? -1 : 6 - dow;
+  const sat = new Date(bog); sat.setDate(bog.getDate() + satOffset);
+  const sun = new Date(sat); sun.setDate(sat.getDate() + 1);
+  const ymd = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  const finde = new Set([ymd(sat), ymd(sun)]);
+
+  const lista = state.matches.filter((m) => m.kickoff && finde.has(bogotaYMD(m.kickoff)));
+  const rango = `${sat.toLocaleDateString("es-CO", { day: "numeric", month: "long" })} y ${sun.toLocaleDateString("es-CO", { day: "numeric", month: "long" })}`;
+
+  const pronost = lista.filter((m) => state.myPreds[m.id]).length;
+  const cerrados = lista.filter((m) => isLocked(m)).length;
+
+  if (!lista.length) {
+    cont.innerHTML = `<div class="today-head">
+      <div class="today-title">🗓️ Fin de semana</div>
+      <div class="today-date">${rango}</div>
+      <div class="today-stats"><span>No hay partidos del Mundial este fin de semana.</span></div>
+    </div>`;
+    return;
+  }
+
+  let html = saveBar("saveWeekBtn", "saveHintWeek");
+  html += `<div class="today-head">
+    <div class="today-title">🗓️ Partidos del fin de semana</div>
+    <div class="today-date">${rango}</div>
+    <div class="today-stats">
+      <span>⚽ <b>${lista.length}</b> partidos</span>
+      <span>📝 <b>${pronost}</b> pronosticados</span>
+      <span>🔒 <b>${cerrados}</b> cerrados</span>
+    </div>
+  </div>`;
+  // Agrupar por día
+  const porDia = {};
+  for (const m of lista) (porDia[bogotaYMD(m.kickoff)] ||= []).push(m);
+  for (const dia of Object.keys(porDia).sort()) {
+    const etiqueta = new Date(dia + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+    html += `<div class="group"><div class="group-title">${etiqueta}</div>`;
+    for (const m of porDia[dia]) html += matchRow(m);
+    html += `</div>`;
   }
   cont.innerHTML = html;
-
-  cont.querySelectorAll(".score-input").forEach((inp) => {
-    inp.addEventListener("input", () => {
-      const h = el("saveHintToday"); if (h) h.textContent = "Cambios sin guardar…";
-    });
-  });
-  const btn = el("saveTodayBtn");
-  if (btn) btn.onclick = () => saveAllPredictions(cont, btn, "saveHintToday");
+  wireSave(cont, "saveWeekBtn", "saveHintWeek");
 }
 
 function matchRow(m) {

@@ -190,6 +190,18 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 .save-row{display:flex; align-items:center; gap:.8rem; margin:.4rem 0 1.4rem}
 .save-row .primary{padding:.55rem 1.4rem}
 
+/* Barra de guardado fija (sigue al hacer scroll) */
+.save-bar{
+  position:sticky; top:var(--header-h, 64px); z-index:8;
+  display:flex; align-items:center; gap:.8rem;
+  background:rgba(13,18,28,.92); backdrop-filter:blur(10px);
+  border:1px solid var(--line); border-radius:12px;
+  padding:.55rem .7rem; margin-bottom:1.1rem;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.save-bar .primary{flex:1; padding:.7rem}
+.save-hint{color:var(--warn); font-size:.82rem; white-space:nowrap}
+
 /* Ranking */
 .rank-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px}
 table.rank{width:100%; border-collapse:collapse; background:var(--panel);
