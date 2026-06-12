@@ -1,0 +1,28 @@
+name: Recordatorios por correo
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 13:00 UTC = 8:00 a.m. hora Colombia
+  workflow_dispatch: {}      # botón para probarlo a mano
+
+concurrency:
+  group: recordatorios
+  cancel-in-progress: false
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Enviar recordatorios
+        env:
+          AZURE_TENANT_ID:     ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID:     ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          MAIL_SENDER:         ${{ secrets.MAIL_SENDER }}
+          SUPABASE_URL:        ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/enviar-recordatorios.mjs
