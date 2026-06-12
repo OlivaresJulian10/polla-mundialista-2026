@@ -23,7 +23,16 @@ const horaCol = (iso) =>
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "America/Bogota",
   });
 
-function buildEmail(name, matches) {
+function motivacion(pos, total, puntos) {
+  if (puntos > 0 && pos === 1)
+    return { txt: "🥇 <b>¡Vas de LÍDER!</b> Defiende tu primer lugar pronosticando hoy.", bg: "#fef9c3", color: "#854d0e" };
+  if (puntos > 0 && pos <= 3)
+    return { txt: `🏅 Vas en el <b>puesto #${pos}</b> de ${total}. ¡El podio está cerca!`, bg: "#dcfce7", color: "#166534" };
+  return { txt: `📊 Vas en el <b>puesto #${pos}</b> de ${total}. ¡Pronostica y sube posiciones!`, bg: "#dbeafe", color: "#1e40af" };
+}
+
+function buildEmail(name, matches, puntos, pos, total) {
+  const mot = motivacion(pos, total, puntos);
   const filas = matches.map((m) => `
     <tr>
       <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:15px;color:#111827;">
@@ -44,7 +53,10 @@ function buildEmail(name, matches) {
           <div style="color:#dcfce7;font-size:13px;">Hidroituango S.A.</div>
         </td></tr>
         <tr><td style="padding:26px 26px 8px;">
-          <p style="font-size:17px;color:#111827;margin:0 0 6px;">¡Hola, ${name}! 👋</p>
+          <p style="font-size:17px;color:#111827;margin:0 0 10px;">¡Hola, ${name}! 👋</p>
+          <div style="background:${mot.bg};color:${mot.color};font-size:14px;font-weight:600;padding:11px 14px;border-radius:10px;margin:0 0 16px;">
+            ${mot.txt}
+          </div>
           <p style="font-size:15px;color:#374151;margin:0 0 18px;line-height:1.5;">
             Te faltan pronósticos para los partidos de <b>hoy</b>. ¡No te quedes sin sumar puntos!
             Recuerda que cada partido se cierra <b>10 minutos antes</b> de empezar.
@@ -113,7 +125,10 @@ async function main() {
   // Agrupar por usuario
   const byUser = {};
   for (const r of rows) {
-    (byUser[r.email] ||= { name: r.display_name, matches: [] }).matches.push(r);
+    (byUser[r.email] ||= {
+      name: r.display_name, puntos: Number(r.puntos), pos: Number(r.posicion),
+      total: Number(r.total_jugadores), matches: [],
+    }).matches.push(r);
   }
   const usuarios = Object.entries(byUser);
   if (!usuarios.length) { console.log("Nadie por recordar hoy. 🎉"); return; }
@@ -122,7 +137,7 @@ async function main() {
   let ok = 0, fail = 0;
   for (const [email, info] of usuarios) {
     try {
-      await sendMail(token, email, buildEmail(info.name, info.matches));
+      await sendMail(token, email, buildEmail(info.name, info.matches, info.puntos, info.pos, info.total));
       console.log(`✓ ${email} (${info.matches.length} partidos)`);
       ok++;
     } catch (e) {
