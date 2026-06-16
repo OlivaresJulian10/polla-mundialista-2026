@@ -51,13 +51,41 @@ const headers = {
   "Content-Type": "application/json",
 };
 
+// Devuelve YYYY-MM-DD (UTC) de hace N días hasta mañana
+function recentDates(daysBack = 6) {
+  const out = [];
+  for (let i = daysBack; i >= -1; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function isFinished(ev) {
+  const s = (ev.strStatus || "").toLowerCase();
+  return s === "ft" || s.includes("finished") || s.includes("aet") || s.includes("pen") || s.includes("after");
+}
+
 async function main() {
-  // 1) Resultados reales desde TheSportsDB
-  const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsseason.php?id=${LEAGUE}&s=${SEASON}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`TheSportsDB ${res.status}`);
-  const events = (await res.json()).events || [];
-  console.log(`Eventos del Mundial recibidos: ${events.length}`);
+  // 1) Resultados reales desde TheSportsDB, traídos POR DÍA (estable) y
+  //    solo los partidos del Mundial (liga 4429) ya FINALIZADOS.
+  const dates = recentDates(6);
+  const seen = new Set();
+  const events = [];
+  for (const d of dates) {
+    try {
+      const res = await fetch(`https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${d}&s=Soccer`);
+      if (!res.ok) { console.warn(`día ${d}: HTTP ${res.status}`); continue; }
+      const evs = (await res.json()).events || [];
+      for (const ev of evs) {
+        if (ev.idLeague !== String(LEAGUE)) continue;
+        if (seen.has(ev.idEvent)) continue;
+        seen.add(ev.idEvent);
+        events.push(ev);
+      }
+    } catch (e) { console.warn(`día ${d}: ${e.message}`); }
+  }
+  console.log(`Partidos del Mundial encontrados (últimos días): ${events.length}`);
 
   // 2) Nuestros partidos
   const mRes = await fetch(
@@ -72,7 +100,8 @@ async function main() {
   let updated = 0, unchanged = 0, noMatch = 0, pending = 0;
 
   for (const ev of events) {
-    if (ev.intHomeScore == null || ev.intAwayScore == null) { pending++; continue; }
+    // Solo marcadores FINALES (nunca en vivo) para no escribir resultados incorrectos
+    if (!isFinished(ev) || ev.intHomeScore == null || ev.intAwayScore == null) { pending++; continue; }
 
     const homeES = toES(ev.strHomeTeam);
     const awayES = toES(ev.strAwayTeam);
