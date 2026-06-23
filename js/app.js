@@ -124,6 +124,7 @@ function showView(name) {
     b.classList.toggle("active", b.dataset.view === name)
   );
   setHeaderH();
+  el("syncFab").classList.toggle("hidden", !(name === "admin" && state.profile?.is_admin));
   if (name === "today") renderToday();
   if (name === "weekend") renderWeekend();
   if (name === "matches") renderMatches();
@@ -554,10 +555,7 @@ function renderAdmin() {
     (byStage[key] ||= []).push(m);
   }
 
-  let html = `<div class="sync-bar">
-    <button class="primary" id="syncBtn">🔄 Sincronizar resultados ahora</button>
-    <span class="muted" id="syncHint">Trae los marcadores finales automáticamente.</span>
-  </div>`;
+  let html = "";
   for (const key of Object.keys(byStage)) {
     const [stage, letter] = key.split(":");
     const title = stage === "group" ? `Grupo ${letter}` : STAGE_LABELS[stage] || stage;
@@ -585,31 +583,34 @@ function renderAdmin() {
   cont.querySelectorAll("[data-save]").forEach((btn) => {
     btn.onclick = () => saveResult(Number(btn.dataset.save));
   });
-  el("syncBtn").onclick = triggerSync;
 
   loadParticipation();
 }
 
-// Dispara el robot de resultados (football-data) desde el botón del admin
+// Botón flotante: dispara el robot de resultados (football-data)
+el("syncFab").onclick = triggerSync;
 async function triggerSync() {
-  const btn = el("syncBtn"), hint = el("syncHint");
+  const btn = el("syncFab");
   const { error } = await sb.rpc("trigger_sync");
   if (error) { toast("No se pudo sincronizar: " + error.message, "error"); return; }
 
+  const orig = btn.textContent;
   btn.disabled = true;
-  toast("Sincronizando… los resultados aparecen en unos segundos ⏳");
+  toast("Sincronizando… los resultados aparecen en ~30s ⏳");
   let secs = 30;
-  hint.textContent = `Buscando marcadores… (${secs}s)`;
+  btn.textContent = `⏳ ${secs}s`;
   const timer = setInterval(() => {
     secs -= 1;
-    hint.textContent = `Buscando marcadores… (${secs}s)`;
+    btn.textContent = `⏳ ${secs}s`;
     if (secs <= 0) clearInterval(timer);
   }, 1000);
 
   setTimeout(async () => {
     clearInterval(timer);
     await loadMatchesAndPreds();
-    renderAdmin();
+    if (!el("adminView").classList.contains("hidden")) renderAdmin();
+    btn.disabled = false;
+    btn.textContent = orig;
     toast("Listo ✅ resultados actualizados");
   }, 30000);
 }
