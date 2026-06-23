@@ -1,142 +1,140 @@
 // =====================================================================
-//  Sincroniza los resultados REALES del Mundial 2026 hacia Supabase.
-//  Fuente: TheSportsDB (gratis). Liga 4429 (FIFA World Cup), temporada 2026.
-//  Se ejecuta solo desde GitHub Actions cada 30 min.
-//  Requiere el secret SUPABASE_SERVICE_KEY (clave 'secret' de Supabase).
+//  Sincroniza resultados y horarios del Mundial 2026 hacia Supabase.
+//  Fuente PRINCIPAL: football-data.org (rápida y confiable, 1 sola llamada).
+//  Respaldo: TheSportsDB (por día) si no hay token de football-data.
+//  Solo escribe marcadores FINALES. También corrige los horarios.
+//  Requiere el secret SUPABASE_SERVICE_KEY (y, recomendado, FOOTBALL_DATA_TOKEN).
 // =====================================================================
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://ucaalcrdujucpdnmxjsd.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const SPORTSDB_KEY = process.env.SPORTSDB_KEY || "3"; // clave pública de prueba
+const FD_TOKEN = process.env.FOOTBALL_DATA_TOKEN;     // football-data.org
+const SPORTSDB_KEY = process.env.SPORTSDB_KEY || "3"; // respaldo
 const LEAGUE = "4429";
-const SEASON = "2026";
 
 if (!SERVICE_KEY) {
-  console.error("❌ Falta el secret SUPABASE_SERVICE_KEY en GitHub.");
+  console.error("❌ Falta el secret SUPABASE_SERVICE_KEY.");
   process.exit(1);
 }
 
-// Nombre en inglés (TheSportsDB) -> nombre en español (como está en la app)
+// Nombre en inglés (cualquiera de las dos fuentes) -> nombre en español (app)
 const EN2ES = {
   "mexico": "México", "south africa": "Sudáfrica", "south korea": "Corea del Sur",
   "czech republic": "Chequia", "czechia": "Chequia", "canada": "Canadá",
-  "bosnia and herzegovina": "Bosnia y Herzegovina", "qatar": "Catar",
-  "switzerland": "Suiza", "usa": "Estados Unidos", "united states": "Estados Unidos",
-  "paraguay": "Paraguay", "australia": "Australia", "turkey": "Turquía",
-  "türkiye": "Turquía", "turkiye": "Turquía", "brazil": "Brasil",
-  "morocco": "Marruecos", "haiti": "Haití", "scotland": "Escocia",
-  "germany": "Alemania", "curacao": "Curazao", "curaçao": "Curazao",
-  "netherlands": "Países Bajos", "japan": "Japón", "ivory coast": "Costa de Marfil",
-  "cote d'ivoire": "Costa de Marfil", "côte d'ivoire": "Costa de Marfil",
+  "bosnia and herzegovina": "Bosnia y Herzegovina", "bosnia-herzegovina": "Bosnia y Herzegovina",
+  "qatar": "Catar", "switzerland": "Suiza", "usa": "Estados Unidos",
+  "united states": "Estados Unidos", "paraguay": "Paraguay", "australia": "Australia",
+  "turkey": "Turquía", "türkiye": "Turquía", "turkiye": "Turquía", "brazil": "Brasil",
+  "morocco": "Marruecos", "haiti": "Haití", "scotland": "Escocia", "germany": "Alemania",
+  "curacao": "Curazao", "curaçao": "Curazao", "netherlands": "Países Bajos", "japan": "Japón",
+  "ivory coast": "Costa de Marfil", "cote d'ivoire": "Costa de Marfil", "côte d'ivoire": "Costa de Marfil",
   "ecuador": "Ecuador", "sweden": "Suecia", "tunisia": "Túnez", "spain": "España",
-  "cape verde": "Cabo Verde", "cabo verde": "Cabo Verde", "belgium": "Bélgica",
-  "egypt": "Egipto", "saudi arabia": "Arabia Saudita", "uruguay": "Uruguay",
-  "iran": "Irán", "new zealand": "Nueva Zelanda", "france": "Francia",
-  "senegal": "Senegal", "iraq": "Irak", "norway": "Noruega", "argentina": "Argentina",
-  "algeria": "Argelia", "austria": "Austria", "jordan": "Jordania",
-  "portugal": "Portugal", "dr congo": "RD Congo", "congo dr": "RD Congo",
-  "democratic republic of congo": "RD Congo", "england": "Inglaterra",
-  "croatia": "Croacia", "ghana": "Ghana", "panama": "Panamá",
-  "uzbekistan": "Uzbekistán", "colombia": "Colombia",
+  "cape verde": "Cabo Verde", "cape verde islands": "Cabo Verde", "belgium": "Bélgica",
+  "egypt": "Egipto", "saudi arabia": "Arabia Saudita", "uruguay": "Uruguay", "iran": "Irán",
+  "new zealand": "Nueva Zelanda", "france": "Francia", "senegal": "Senegal", "iraq": "Irak",
+  "norway": "Noruega", "argentina": "Argentina", "algeria": "Argelia", "austria": "Austria",
+  "jordan": "Jordania", "portugal": "Portugal", "dr congo": "RD Congo", "congo dr": "RD Congo",
+  "democratic republic of congo": "RD Congo", "england": "Inglaterra", "croatia": "Croacia",
+  "ghana": "Ghana", "panama": "Panamá", "uzbekistan": "Uzbekistán", "colombia": "Colombia",
 };
-
 const norm = (s) => (s || "").trim().toLowerCase();
-const toES = (name) => EN2ES[norm(name)] || name;
+const toES = (n) => EN2ES[norm(n)] || n;
 const pairKey = (a, b) => [norm(a), norm(b)].sort().join(" :: ");
 
 const headers = {
-  apikey: SERVICE_KEY,
-  Authorization: `Bearer ${SERVICE_KEY}`,
-  "Content-Type": "application/json",
+  apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json",
 };
 
-// Fechas (YYYY-MM-DD UTC) desde 'back' días atrás hasta 'fwd' adelante.
-// Hacia adelante para corregir horarios de próximos partidos; hacia atrás
-// para resultados recientes.
-function recentDates(back = 3, fwd = 13) {
-  const out = [];
-  for (let i = back; i >= -fwd; i--) {
-    out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+// ---------- Fuente principal: football-data.org ----------
+async function getFromFootballData() {
+  const res = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
+    headers: { "X-Auth-Token": FD_TOKEN },
+  });
+  if (!res.ok) throw new Error(`football-data ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return (data.matches || []).map((m) => ({
+    home: toES(m.homeTeam?.name), away: toES(m.awayTeam?.name),
+    finished: m.status === "FINISHED",
+    hs: m.score?.fullTime?.home, as: m.score?.fullTime?.away,
+    kickoff: m.utcDate || null,
+  }));
+}
+
+// ---------- Respaldo: TheSportsDB por día ----------
+async function getFromSportsDB() {
+  const dates = [];
+  for (let i = 3; i >= -13; i--) dates.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+  const seen = new Set(), out = [];
+  for (const d of dates) {
+    try {
+      const r = await fetch(`https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${d}&s=Soccer`);
+      if (!r.ok) continue;
+      for (const ev of ((await r.json()).events || [])) {
+        if (ev.idLeague !== LEAGUE || seen.has(ev.idEvent)) continue;
+        seen.add(ev.idEvent);
+        const st = (ev.strStatus || "").toLowerCase();
+        out.push({
+          home: toES(ev.strHomeTeam), away: toES(ev.strAwayTeam),
+          finished: st === "ft" || st.includes("finished") || st.includes("aet") || st.includes("pen"),
+          hs: ev.intHomeScore == null ? null : +ev.intHomeScore,
+          as: ev.intAwayScore == null ? null : +ev.intAwayScore,
+          kickoff: ev.strTimestamp ? (ev.strTimestamp.endsWith("Z") ? ev.strTimestamp : ev.strTimestamp + "Z") : null,
+        });
+      }
+    } catch {}
   }
   return out;
 }
 
-function isFinished(ev) {
-  const s = (ev.strStatus || "").toLowerCase();
-  return s === "ft" || s.includes("finished") || s.includes("aet") || s.includes("pen") || s.includes("after");
-}
-
 async function main() {
-  // 1) Resultados reales desde TheSportsDB, traídos POR DÍA (estable) y
-  //    solo los partidos del Mundial (liga 4429) ya FINALIZADOS.
-  const dates = recentDates(3, 13);
-  const seen = new Set();
-  const events = [];
-  for (const d of dates) {
-    try {
-      const res = await fetch(`https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${d}&s=Soccer`);
-      if (!res.ok) { console.warn(`día ${d}: HTTP ${res.status}`); continue; }
-      const evs = (await res.json()).events || [];
-      for (const ev of evs) {
-        if (ev.idLeague !== String(LEAGUE)) continue;
-        if (seen.has(ev.idEvent)) continue;
-        seen.add(ev.idEvent);
-        events.push(ev);
-      }
-    } catch (e) { console.warn(`día ${d}: ${e.message}`); }
+  let events, fuente;
+  if (FD_TOKEN) {
+    try { events = await getFromFootballData(); fuente = "football-data.org"; }
+    catch (e) { console.warn("⚠️ football-data falló, uso respaldo:", e.message); }
   }
-  console.log(`Partidos del Mundial encontrados (últimos días): ${events.length}`);
+  if (!events) { events = await getFromSportsDB(); fuente = "TheSportsDB (respaldo)"; }
+  console.log(`Fuente: ${fuente} | partidos: ${events.length}`);
 
-  // 2) Nuestros partidos
-  const mRes = await fetch(
+  const matches = await (await fetch(
     `${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff`,
-    { headers }
-  );
-  if (!mRes.ok) throw new Error(`Supabase GET ${mRes.status}: ${await mRes.text()}`);
-  const matches = await mRes.json();
+    { headers })).json();
   const idx = new Map();
   for (const m of matches) idx.set(pairKey(m.home_team, m.away_team), m);
 
-  let updated = 0, unchanged = 0, noMatch = 0, pending = 0, horas = 0;
+  let resultados = 0, horas = 0, sinCambios = 0, sinJugar = 0, sinCoincidencia = 0;
 
   for (const ev of events) {
-    const homeES = toES(ev.strHomeTeam);
-    const awayES = toES(ev.strAwayTeam);
-    const m = idx.get(pairKey(homeES, awayES));
-    if (!m) { noMatch++; continue; }
+    const m = idx.get(pairKey(ev.home, ev.away));
+    if (!m) { sinCoincidencia++; continue; }
 
-    // 2a) Sincronizar la HORA del partido (de la fuente confiable, en cualquier estado)
-    if (ev.strTimestamp) {
-      const ts = ev.strTimestamp.endsWith("Z") || ev.strTimestamp.includes("+") ? ev.strTimestamp : ev.strTimestamp + "Z";
-      const nuevaUtc = new Date(ts);
-      if (!isNaN(nuevaUtc) && (!m.kickoff || Math.abs(new Date(m.kickoff) - nuevaUtc) > 60000)) {
+    // Horario (cualquier estado)
+    if (ev.kickoff) {
+      const nueva = new Date(ev.kickoff);
+      if (!isNaN(nueva) && (!m.kickoff || Math.abs(new Date(m.kickoff) - nueva) > 60000)) {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${m.id}`, {
           method: "PATCH", headers: { ...headers, Prefer: "return=minimal" },
-          body: JSON.stringify({ kickoff: nuevaUtc.toISOString() }),
+          body: JSON.stringify({ kickoff: nueva.toISOString() }),
         });
-        if (r.ok) { console.log(`🕒 hora ${m.home_team} vs ${m.away_team} → ${nuevaUtc.toISOString()}`); horas++; m.kickoff = nuevaUtc.toISOString(); }
-        else console.error(`❌ hora ${m.home_team}: ${r.status} ${await r.text()}`);
+        if (r.ok) { console.log(`🕒 hora ${m.home_team} vs ${m.away_team}`); horas++; m.kickoff = nueva.toISOString(); }
       }
     }
 
-    // 2b) Sincronizar el RESULTADO solo si está FINALIZADO (nunca en vivo)
-    if (!isFinished(ev) || ev.intHomeScore == null || ev.intAwayScore == null) { pending++; continue; }
-    let hs, as;
-    if (norm(m.home_team) === norm(homeES)) { hs = +ev.intHomeScore; as = +ev.intAwayScore; }
-    else { hs = +ev.intAwayScore; as = +ev.intHomeScore; }
-    if (m.home_score === hs && m.away_score === as) { unchanged++; continue; }
+    // Resultado SOLO si está finalizado
+    if (!ev.finished || ev.hs == null || ev.as == null) { sinJugar++; continue; }
+    const hs = +ev.hs, as = +ev.as;
+    if (m.home_score === hs && m.away_score === as) { sinCambios++; continue; }
 
     const pRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${m.id}`, {
       method: "PATCH", headers: { ...headers, Prefer: "return=minimal" },
       body: JSON.stringify({ home_score: hs, away_score: as }),
     });
-    if (!pRes.ok) { console.error(`❌ ${homeES} vs ${awayES}: ${pRes.status} ${await pRes.text()}`); continue; }
+    if (!pRes.ok) { console.error(`❌ ${ev.home} vs ${ev.away}: ${pRes.status} ${await pRes.text()}`); continue; }
     console.log(`✓ ${m.home_team} ${hs}-${as} ${m.away_team}`);
-    updated++;
+    resultados++;
   }
 
-  console.log(`\nResumen → resultados: ${updated} | horas corregidas: ${horas} | sin cambios: ${unchanged} | sin jugar: ${pending} | sin coincidencia: ${noMatch}`);
+  console.log(`\nResumen → resultados: ${resultados} | horas: ${horas} | sin cambios: ${sinCambios} | sin jugar: ${sinJugar} | sin coincidencia: ${sinCoincidencia}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
