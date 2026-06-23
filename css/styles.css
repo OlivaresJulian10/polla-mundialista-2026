@@ -202,6 +202,16 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 .save-bar .primary{flex:1; padding:.7rem}
 .save-hint{color:var(--warn); font-size:.82rem; white-space:nowrap}
 
+/* Botón Sincronizar (admin) */
+.sync-bar{
+  display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;
+  background:linear-gradient(135deg, rgba(34,197,94,.18), rgba(56,189,248,.14));
+  border:1px solid rgba(255,255,255,.12); border-radius:12px;
+  padding:.8rem 1rem; margin-bottom:1.2rem;
+}
+.sync-bar .primary{padding:.7rem 1.3rem}
+.sync-bar #syncHint{font-size:.85rem}
+
 /* Ranking */
 .rank-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px}
 table.rank{width:100%; border-collapse:collapse; background:var(--panel);

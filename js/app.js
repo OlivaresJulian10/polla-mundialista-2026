@@ -554,7 +554,10 @@ function renderAdmin() {
     (byStage[key] ||= []).push(m);
   }
 
-  let html = "";
+  let html = `<div class="sync-bar">
+    <button class="primary" id="syncBtn">🔄 Sincronizar resultados ahora</button>
+    <span class="muted" id="syncHint">Trae los marcadores finales automáticamente.</span>
+  </div>`;
   for (const key of Object.keys(byStage)) {
     const [stage, letter] = key.split(":");
     const title = stage === "group" ? `Grupo ${letter}` : STAGE_LABELS[stage] || stage;
@@ -582,8 +585,33 @@ function renderAdmin() {
   cont.querySelectorAll("[data-save]").forEach((btn) => {
     btn.onclick = () => saveResult(Number(btn.dataset.save));
   });
+  el("syncBtn").onclick = triggerSync;
 
   loadParticipation();
+}
+
+// Dispara el robot de resultados (football-data) desde el botón del admin
+async function triggerSync() {
+  const btn = el("syncBtn"), hint = el("syncHint");
+  const { error } = await sb.rpc("trigger_sync");
+  if (error) { toast("No se pudo sincronizar: " + error.message, "error"); return; }
+
+  btn.disabled = true;
+  toast("Sincronizando… los resultados aparecen en unos segundos ⏳");
+  let secs = 30;
+  hint.textContent = `Buscando marcadores… (${secs}s)`;
+  const timer = setInterval(() => {
+    secs -= 1;
+    hint.textContent = `Buscando marcadores… (${secs}s)`;
+    if (secs <= 0) clearInterval(timer);
+  }, 1000);
+
+  setTimeout(async () => {
+    clearInterval(timer);
+    await loadMatchesAndPreds();
+    renderAdmin();
+    toast("Listo ✅ resultados actualizados");
+  }, 30000);
 }
 
 // ----- Participación (solo admin) -----
