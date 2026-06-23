@@ -53,10 +53,10 @@ async function getFromFootballData() {
   });
   if (!res.ok) throw new Error(`football-data ${res.status}: ${await res.text()}`);
   const data = await res.json();
+  const LIVE = new Set(["IN_PLAY", "PAUSED", "LIVE", "SUSPENDED"]);
   return (data.matches || []).map((m) => ({
     home: toES(m.homeTeam?.name), away: toES(m.awayTeam?.name),
-    st: m.status === "FINISHED" ? "finished"
-      : (m.status === "IN_PLAY" || m.status === "PAUSED") ? "live" : "scheduled",
+    st: m.status === "FINISHED" ? "finished" : LIVE.has(m.status) ? "live" : "scheduled",
     hs: m.score?.fullTime?.home, as: m.score?.fullTime?.away,
     kickoff: m.utcDate || null,
   }));
