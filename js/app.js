@@ -171,6 +171,7 @@ async function start(user) {
 
   await loadMatchesAndPreds();
   showView("matches");
+  startLiveRefresh();
 }
 
 // =====================================================================
@@ -297,13 +298,36 @@ function saveBar(btnId, hintId) {
   </div>`;
 }
 function wireSave(cont, btnId, hintId) {
+  dirty = false;
   cont.querySelectorAll(".score-input").forEach((inp) => {
     inp.addEventListener("input", () => {
+      dirty = true;
       const h = el(hintId); if (h) h.textContent = "Cambios sin guardar…";
     });
   });
   const btn = el(btnId);
   if (btn) btn.onclick = () => saveAllPredictions(cont, btn, hintId);
+}
+
+// Auto-refresco "en vivo": refresca marcadores y ranking cada 30s,
+// sin borrar lo que el usuario esté escribiendo (bandera dirty).
+let dirty = false;
+let liveTimer = null;
+function startLiveRefresh() {
+  if (liveTimer) return;
+  liveTimer = setInterval(async () => {
+    if (!state.user) return;
+    const active = document.querySelector("#nav button.active")?.dataset.view;
+    const { data: ms } = await sb.from("matches").select("*")
+      .order("kickoff", { ascending: true }).order("id");
+    if (ms) state.matches = ms;
+    if (active === "ranking") loadRanking();
+    else if (!dirty) {
+      if (active === "today") renderToday();
+      else if (active === "weekend") renderWeekend();
+      else if (active === "matches") renderMatches();
+    }
+  }, 30000);
 }
 
 // =====================================================================
@@ -426,7 +450,9 @@ function matchRow(m) {
   const pa = pred ? pred.pred_away : "";
 
   let right = `<span class="badge"></span>`;
-  if (hasResult) right = `<span class="badge result">Final ${m.home_score}–${m.away_score}</span>`;
+  if (m.status === "live")
+    right = `<span class="badge live">🔴 EN VIVO ${m.home_score ?? 0}–${m.away_score ?? 0}</span>`;
+  else if (hasResult) right = `<span class="badge result">Final ${m.home_score}–${m.away_score}</span>`;
   else if (locked) right = `<span class="badge locked">🔒 Cerrado</span>`;
 
   let ptsBadge = "";
@@ -499,6 +525,7 @@ async function saveAllPredictions(container, btn, hintId) {
 
   btn.disabled = false; btn.textContent = savingText;
   if (hintId && el(hintId)) el(hintId).textContent = "";
+  if (okCount > 0) dirty = false;
 
   if (okCount === 0) {
     toast("No se pudo guardar: " + (failMsg || "permiso denegado"), "error");

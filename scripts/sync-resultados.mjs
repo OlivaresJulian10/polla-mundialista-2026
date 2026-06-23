@@ -55,7 +55,8 @@ async function getFromFootballData() {
   const data = await res.json();
   return (data.matches || []).map((m) => ({
     home: toES(m.homeTeam?.name), away: toES(m.awayTeam?.name),
-    finished: m.status === "FINISHED",
+    st: m.status === "FINISHED" ? "finished"
+      : (m.status === "IN_PLAY" || m.status === "PAUSED") ? "live" : "scheduled",
     hs: m.score?.fullTime?.home, as: m.score?.fullTime?.away,
     kickoff: m.utcDate || null,
   }));
@@ -73,10 +74,12 @@ async function getFromSportsDB() {
       for (const ev of ((await r.json()).events || [])) {
         if (ev.idLeague !== LEAGUE || seen.has(ev.idEvent)) continue;
         seen.add(ev.idEvent);
-        const st = (ev.strStatus || "").toLowerCase();
+        const raw = (ev.strStatus || "").toLowerCase();
+        const finished = raw === "ft" || raw.includes("finished") || raw.includes("aet") || raw.includes("pen");
+        const live = !finished && (/^\d/.test(raw) || raw.includes("h") || raw.includes("live"));
         out.push({
           home: toES(ev.strHomeTeam), away: toES(ev.strAwayTeam),
-          finished: st === "ft" || st.includes("finished") || st.includes("aet") || st.includes("pen"),
+          st: finished ? "finished" : live ? "live" : "scheduled",
           hs: ev.intHomeScore == null ? null : +ev.intHomeScore,
           as: ev.intAwayScore == null ? null : +ev.intAwayScore,
           kickoff: ev.strTimestamp ? (ev.strTimestamp.endsWith("Z") ? ev.strTimestamp : ev.strTimestamp + "Z") : null,
@@ -97,44 +100,55 @@ async function main() {
   console.log(`Fuente: ${fuente} | partidos: ${events.length}`);
 
   const matches = await (await fetch(
-    `${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff`,
+    `${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status`,
     { headers })).json();
   const idx = new Map();
   for (const m of matches) idx.set(pairKey(m.home_team, m.away_team), m);
 
-  let resultados = 0, horas = 0, sinCambios = 0, sinJugar = 0, sinCoincidencia = 0;
+  let resultados = 0, vivos = 0, horas = 0, sinCambios = 0, sinJugar = 0, sinCoincidencia = 0;
 
   for (const ev of events) {
     const m = idx.get(pairKey(ev.home, ev.away));
     if (!m) { sinCoincidencia++; continue; }
+    const patch = {};
 
     // Horario (cualquier estado)
     if (ev.kickoff) {
       const nueva = new Date(ev.kickoff);
       if (!isNaN(nueva) && (!m.kickoff || Math.abs(new Date(m.kickoff) - nueva) > 60000)) {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${m.id}`, {
-          method: "PATCH", headers: { ...headers, Prefer: "return=minimal" },
-          body: JSON.stringify({ kickoff: nueva.toISOString() }),
-        });
-        if (r.ok) { console.log(`🕒 hora ${m.home_team} vs ${m.away_team}`); horas++; m.kickoff = nueva.toISOString(); }
+        patch.kickoff = nueva.toISOString();
       }
     }
 
-    // Resultado SOLO si está finalizado
-    if (!ev.finished || ev.hs == null || ev.as == null) { sinJugar++; continue; }
-    const hs = +ev.hs, as = +ev.as;
-    if (m.home_score === hs && m.away_score === as) { sinCambios++; continue; }
+    // Estado en vivo / finalizado / programado
+    if (ev.st === "live" || ev.st === "finished") {
+      if (ev.hs != null && ev.as != null) {
+        const hs = +ev.hs, as = +ev.as;
+        if (m.home_score !== hs) patch.home_score = hs;
+        if (m.away_score !== as) patch.away_score = as;
+      }
+    }
+    if (m.status !== ev.st && ev.st !== "scheduled") patch.status = ev.st;
+    else if (ev.st === "scheduled" && m.status === "live") patch.status = "scheduled"; // se reprogramó
 
-    const pRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${m.id}`, {
+    if (Object.keys(patch).length === 0) {
+      if (ev.st === "live") vivos++; else if (ev.st === "finished") sinCambios++; else sinJugar++;
+      continue;
+    }
+
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${m.id}`, {
       method: "PATCH", headers: { ...headers, Prefer: "return=minimal" },
-      body: JSON.stringify({ home_score: hs, away_score: as }),
+      body: JSON.stringify(patch),
     });
-    if (!pRes.ok) { console.error(`❌ ${ev.home} vs ${ev.away}: ${pRes.status} ${await pRes.text()}`); continue; }
-    console.log(`✓ ${m.home_team} ${hs}-${as} ${m.away_team}`);
-    resultados++;
+    if (!r.ok) { console.error(`❌ ${ev.home} vs ${ev.away}: ${r.status} ${await r.text()}`); continue; }
+    if (patch.kickoff) horas++;
+    if (ev.st === "live") { console.log(`🔴 EN VIVO ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); vivos++; }
+    else if (ev.st === "finished" && (patch.home_score != null || patch.away_score != null || patch.status)) {
+      console.log(`✓ FINAL ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); resultados++;
+    }
   }
 
-  console.log(`\nResumen → resultados: ${resultados} | horas: ${horas} | sin cambios: ${sinCambios} | sin jugar: ${sinJugar} | sin coincidencia: ${sinCoincidencia}`);
+  console.log(`\nResumen → finalizados: ${resultados} | en vivo: ${vivos} | horas: ${horas} | sin cambios: ${sinCambios} | por jugar: ${sinJugar} | sin coincidencia: ${sinCoincidencia}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

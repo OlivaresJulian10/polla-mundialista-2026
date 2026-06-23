@@ -187,6 +187,8 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 .badge.locked{background:#3a2a16; color:var(--warn)}
 .badge.result{background:#16321f; color:var(--primary-2)}
 .badge.pts{background:#1c2a44; color:#93b4ff}
+.badge.live{background:#3a1620; color:#ff6b81; font-weight:800; animation:livePulse 1.4s ease-in-out infinite}
+@keyframes livePulse{0%,100%{opacity:1}50%{opacity:.55}}
 .save-row{display:flex; align-items:center; gap:.8rem; margin:.4rem 0 1.4rem}
 .save-row .primary{padding:.55rem 1.4rem}
 
