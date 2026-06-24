@@ -140,8 +140,11 @@ async function main() {
     const el = Date.now() - new Date(e.kickoff).getTime();
     return el >= 0 && el < 2.5 * 3600 * 1000;
   });
-  const liveData = posibleVivo ? await getLiveData() : new Map();
-  if (posibleVivo) console.log(`API-Football en vivo: ${liveData.size}`);
+  // Throttle: consultar API-Football ~cada 6 min (cuida el cupo gratis 100/día → evita suspensión)
+  const afTurn = new Date().getUTCMinutes() % 6 < 3;
+  const afConsulted = posibleVivo && afTurn;
+  const liveData = afConsulted ? await getLiveData() : new Map();
+  if (afConsulted) console.log(`API-Football en vivo: ${liveData.size}`);
 
   // Tolerante: si aún no existen las columnas nuevas, reintenta sin ellas
   let mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status,live_minute`, { headers });
@@ -185,7 +188,7 @@ async function main() {
     } else if (lv && lv.hs != null && lv.as != null) {        // en vivo confiable (API-Football)
       if (m.home_score !== +lv.hs) patch.home_score = +lv.hs;
       if (m.away_score !== +lv.as) patch.away_score = +lv.as;
-    } else if (enJuego && m.status !== "finished") {           // en vivo sin datos → 0-0 (no marcador errado)
+    } else if (enJuego && afConsulted && m.status !== "finished") { // confirmado sin datos → 0-0 (no marcador errado)
       if (m.home_score != null) patch.home_score = null;
       if (m.away_score != null) patch.away_score = null;
     }
@@ -199,7 +202,7 @@ async function main() {
       if (st === "live" && lv.minute != null) { patch.live_minute = lv.minute; patch.live_minute_at = new Date().toISOString(); }
       else if (st === "halftime" && m.live_minute != null) { patch.live_minute = null; patch.live_minute_at = null; }
       if (lv.events && lv.events.length) patch.live_events = lv.events;
-    } else if (st !== "finished" && m.live_minute != null) {
+    } else if (afConsulted && st !== "finished" && m.live_minute != null) {
       patch.live_minute = null; patch.live_minute_at = null;
     } else if (st === "finished" && m.live_minute != null) {
       patch.live_minute = null; patch.live_minute_at = null; // conserva live_events
