@@ -316,23 +316,45 @@ function liveBoxHtml() {
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
   if (!live && !next) return "";
 
+  // Tu pronóstico para ese partido (y cómo va si está en juego)
+  const predLine = (m, comparar) => {
+    const p = state.myPreds[m.id];
+    if (!p) return `<div class="lb-pred lb-pred-none">📝 Aún no has pronosticado este partido</div>`;
+    let extra = "";
+    if (comparar && m.home_score != null) {
+      const pts = pointsFor(p, m);
+      extra = pts === 5 ? ` <span class="lb-ok">· 🎯 ¡exacto!</span>`
+        : pts === 3 ? ` <span class="lb-ok">· ✅ vas acertando</span>`
+        : ` <span class="lb-bad">· ⏳ por ahora no suma</span>`;
+    }
+    return `<div class="lb-pred">Tu pronóstico: <b>${p.pred_home}–${p.pred_away}</b>${extra}</div>`;
+  };
+
   let rows = "";
   if (live) {
     const min = live.status === "halftime" ? "⏸️ Entretiempo" : liveMinute(live);
-    rows += `<div class="lb-row lb-clickable" data-detail="${live.id}">
-      <span class="lb-tag lb-live">🔴 EN JUEGO</span>
-      <span class="lb-teams">${crest(live.home_team)} ${live.home_team}
-        <b class="lb-score">${live.home_score ?? 0}–${live.away_score ?? 0}</b>
-        ${live.away_team} ${crest(live.away_team)}</span>
-      <span class="lb-min">${min}</span>
-      <span class="lb-detalle">ver detalle ▸</span></div>`;
+    rows += `<div class="lb-item">
+      <div class="lb-row lb-clickable" data-detail="${live.id}">
+        <span class="lb-tag lb-live">🔴 EN JUEGO</span>
+        <span class="lb-teams">${crest(live.home_team)} ${live.home_team}
+          <b class="lb-score">${live.home_score ?? 0}–${live.away_score ?? 0}</b>
+          ${live.away_team} ${crest(live.away_team)}</span>
+        <span class="lb-min">${min}</span>
+        <span class="lb-detalle">ver detalle ▸</span>
+      </div>
+      ${predLine(live, true)}
+    </div>`;
   }
   if (next) {
-    rows += `<div class="lb-row">
-      <span class="lb-tag lb-next">⏭️ PRÓXIMO</span>
-      <span class="lb-teams">${crest(next.home_team)} ${next.home_team}
-        <span class="vs">vs</span> ${next.away_team} ${crest(next.away_team)}</span>
-      <span class="lb-min">${fmtDate(next.kickoff)}</span></div>`;
+    rows += `<div class="lb-item">
+      <div class="lb-row">
+        <span class="lb-tag lb-next">⏭️ PRÓXIMO</span>
+        <span class="lb-teams">${crest(next.home_team)} ${next.home_team}
+          <span class="vs">vs</span> ${next.away_team} ${crest(next.away_team)}</span>
+        <span class="lb-min">${fmtDate(next.kickoff)}</span>
+      </div>
+      ${predLine(next, false)}
+    </div>`;
   }
   const titulo = live ? "🔴 EN VIVO" : "📡 Partidos";
   return `<div class="livebox ${live ? "livebox-live" : ""}">

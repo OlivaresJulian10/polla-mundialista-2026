@@ -159,6 +159,16 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 .lb-min{font-weight:900; color:#ff6b81; white-space:nowrap}
 .lb-detalle{font-size:.78rem; color:#93b4ff; white-space:nowrap}
 
+/* Tu pronóstico dentro de la ventanita */
+.lb-item{display:flex; flex-direction:column; gap:.25rem; padding:.55rem 0; border-bottom:1px solid var(--line)}
+.lb-item:last-child{border-bottom:none}
+.lb-item:first-child{padding-top:0}
+.lb-pred{font-size:.85rem; color:var(--muted); padding-left:.2rem}
+.lb-pred b{color:var(--text)}
+.lb-pred-none{font-size:.85rem; color:var(--warn); padding-left:.2rem}
+.lb-ok{color:var(--primary-2); font-weight:700}
+.lb-bad{color:var(--muted)}
+
 /* Enlace "detalle" en tarjetas de partido */
 .detalle-link{color:#93b4ff; cursor:pointer; font-weight:700; text-decoration:none}
 .detalle-link:hover{text-decoration:underline}
