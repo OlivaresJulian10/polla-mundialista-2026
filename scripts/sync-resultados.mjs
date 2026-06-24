@@ -94,10 +94,10 @@ async function getFromSportsDB() {
   return out;
 }
 
-// Minuto EXACTO de los partidos del Mundial en vivo (API-Football).
-// Una sola llamada (fixtures?live=all) → mapa pareja -> minuto. Solo se usa
-// cuando hay partidos en vivo, para no gastar el cupo gratis (100/día).
-async function getLiveMinutes() {
+// Minuto EXACTO + eventos (goles, cambios, tarjetas) del Mundial en vivo.
+// Una sola llamada (fixtures?live=all, incluye 'events') → no gasta cupo extra.
+// Solo se usa cuando hay partidos en vivo (cuida el cupo gratis 100/día).
+async function getLiveData() {
   if (!AF_KEY) return new Map();
   try {
     const r = await fetch("https://v3.football.api-sports.io/fixtures?live=all",
@@ -107,9 +107,15 @@ async function getLiveMinutes() {
     const map = new Map();
     for (const f of (j.response || [])) {
       if (!/world cup/i.test(f.league?.name || "")) continue;
-      const el = f.fixture?.status?.elapsed;
-      if (el == null) continue;
-      map.set(pairKey(toES(f.teams?.home?.name), toES(f.teams?.away?.name)), el);
+      const events = (f.events || [])
+        .filter((e) => ["Goal", "subst", "Card"].includes(e.type))
+        .map((e) => ({
+          min: e.time?.elapsed ?? null, extra: e.time?.extra ?? null,
+          type: e.type, detail: e.detail || "",
+          team: e.team?.name || "", player: e.player?.name || "", assist: e.assist?.name || "",
+        }));
+      map.set(pairKey(toES(f.teams?.home?.name), toES(f.teams?.away?.name)),
+        { minute: f.fixture?.status?.elapsed ?? null, events });
     }
     return map;
   } catch (e) { console.warn("API-Football falló:", e.message); return new Map(); }
@@ -126,10 +132,10 @@ async function main() {
 
   // Minuto exacto solo si hay algo en vivo (cuida el cupo de API-Football)
   const hayVivos = events.some((e) => e.st === "live");
-  const minuteMap = hayVivos ? await getLiveMinutes() : new Map();
-  if (hayVivos) console.log(`Minutos en vivo (API-Football): ${minuteMap.size}`);
+  const liveData = hayVivos ? await getLiveData() : new Map();
+  if (hayVivos) console.log(`En vivo (API-Football): ${liveData.size}`);
 
-  // Tolerante: si aún no existe la columna live_minute, reintenta sin ella
+  // Tolerante: si aún no existen las columnas nuevas, reintenta sin ellas
   let mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status,live_minute`, { headers });
   if (!mRes.ok) mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status`, { headers });
   const matches = await mRes.json();
@@ -163,12 +169,17 @@ async function main() {
     if (m.status !== ev.st && ev.st !== "scheduled") patch.status = ev.st;
     else if (ev.st === "scheduled" && (m.status === "live" || m.status === "halftime")) patch.status = "scheduled";
 
-    // Minuto exacto (solo en vivo). Si no llega, se conserva el último (el cliente lo corre).
+    // Minuto exacto + eventos (solo en vivo). Al finalizar se conservan los eventos.
     if (ev.st === "live") {
-      const el = minuteMap.get(pairKey(ev.home, ev.away));
-      if (el != null) { patch.live_minute = el; patch.live_minute_at = new Date().toISOString(); }
-    } else if (m.live_minute != null) {
+      const d = liveData.get(pairKey(ev.home, ev.away));
+      if (d) {
+        if (d.minute != null) { patch.live_minute = d.minute; patch.live_minute_at = new Date().toISOString(); }
+        if (d.events) patch.live_events = d.events;
+      }
+    } else if (ev.st !== "finished" && m.live_minute != null) {
       patch.live_minute = null; patch.live_minute_at = null;
+    } else if (ev.st === "finished" && m.live_minute != null) {
+      patch.live_minute = null; patch.live_minute_at = null; // limpia minuto pero CONSERVA live_events
     }
 
     if (Object.keys(patch).length === 0) {

@@ -319,12 +319,13 @@ function liveBoxHtml() {
   let rows = "";
   if (live) {
     const min = live.status === "halftime" ? "⏸️ Entretiempo" : liveMinute(live);
-    rows += `<div class="lb-row">
+    rows += `<div class="lb-row lb-clickable" data-detail="${live.id}">
       <span class="lb-tag lb-live">🔴 EN JUEGO</span>
       <span class="lb-teams">${crest(live.home_team)} ${live.home_team}
-        <b>${live.home_score ?? 0}–${live.away_score ?? 0}</b>
+        <b class="lb-score">${live.home_score ?? 0}–${live.away_score ?? 0}</b>
         ${live.away_team} ${crest(live.away_team)}</span>
-      <span class="lb-min">${min}</span></div>`;
+      <span class="lb-min">${min}</span>
+      <span class="lb-detalle">ver detalle ▸</span></div>`;
   }
   if (next) {
     rows += `<div class="lb-row">
@@ -333,7 +334,9 @@ function liveBoxHtml() {
         <span class="vs">vs</span> ${next.away_team} ${crest(next.away_team)}</span>
       <span class="lb-min">${fmtDate(next.kickoff)}</span></div>`;
   }
-  return `<div class="livebox">${rows}</div>`;
+  const titulo = live ? "🔴 EN VIVO" : "📡 Partidos";
+  return `<div class="livebox ${live ? "livebox-live" : ""}">
+    <div class="lb-title">${titulo}</div>${rows}</div>`;
 }
 
 // Barra de guardado fija (se queda arriba al hacer scroll)
@@ -518,7 +521,7 @@ function matchRow(m) {
     </div>
     <div class="team away"><span class="flag">${crest(m.away_team)}</span><span class="name">${m.away_team}</span></div>
     <div class="meta">
-      <span>🕒 ${fmtDate(m.kickoff)}</span>
+      <span>🕒 ${fmtDate(m.kickoff)}${(m.live_events && m.live_events.length) ? ` · <a class="detalle-link" data-detail="${m.id}">⚽ detalle</a>` : ""}</span>
       <span>${ptsBadge} ${right}</span>
     </div>
   </div>`;
@@ -776,6 +779,50 @@ async function saveUserPredictions() {
 
 el("modalClose").onclick = () => el("modal").classList.add("hidden");
 el("modal").onclick = (e) => { if (e.target.id === "modal") el("modal").classList.add("hidden"); };
+
+// Detalle de un partido: marcador, estado/minuto y línea de eventos (goles/cambios/tarjetas)
+function openMatchDetail(id) {
+  const m = state.matches.find((x) => x.id === id);
+  if (!m) return;
+  el("modalTitle").textContent = `${m.home_team} vs ${m.away_team}`;
+  const score = m.home_score != null ? `${m.home_score} – ${m.away_score}` : "vs";
+  const estado = m.status === "live" ? `🔴 EN VIVO ${liveMinute(m)}`
+    : m.status === "halftime" ? "⏸️ Entretiempo"
+    : m.home_score != null ? "Final" : `🕒 ${fmtDate(m.kickoff)}`;
+
+  let body = `<div class="md-score">
+      <span>${crest(m.home_team)} ${m.home_team}</span>
+      <span class="md-sc">${score}</span>
+      <span>${m.away_team} ${crest(m.away_team)}</span>
+    </div>
+    <div class="md-state ${m.status === "live" ? "live" : ""}">${estado}</div>`;
+
+  const evs = (m.live_events || []).slice().sort((a, b) => (a.min || 0) - (b.min || 0));
+  if (evs.length) {
+    body += `<div class="md-timeline">` + evs.map((e) => {
+      const icon = e.type === "Goal" ? "⚽" : e.type === "subst" ? "🔄"
+        : /red/i.test(e.detail) ? "🟥" : "🟨";
+      let txt;
+      if (e.type === "Goal") txt = `<b>${e.player}</b>${e.assist ? ` <span class="muted">(asist. ${e.assist})</span>` : ""}`;
+      else if (e.type === "subst") txt = `Entra <b>${e.player}</b>${e.assist ? ` · Sale ${e.assist}` : ""}`;
+      else txt = `${e.detail || "Tarjeta"} — ${e.player}`;
+      const min = (e.min ?? "") + (e.extra ? "+" + e.extra : "") + "'";
+      return `<div class="md-ev"><span class="md-min">${min}</span><span>${icon}</span>
+        <span class="md-txt">${txt} <span class="muted">· ${e.team}</span></span></div>`;
+    }).join("") + `</div>`;
+  } else {
+    body += `<p class="muted md-empty">Sin detalle de goles/cambios disponible.<br>
+      <span style="font-size:.8rem">(Aparece durante el partido y queda guardado al terminar.)</span></p>`;
+  }
+  el("modalBody").innerHTML = body;
+  el("modal").classList.remove("hidden");
+}
+
+// Clic en cualquier "[data-detail]" abre el detalle del partido
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-detail]");
+  if (t) { e.preventDefault(); openMatchDetail(Number(t.dataset.detail)); }
+});
 
 async function saveResult(mid) {
   const home = document.querySelector(`#adminContainer .score-input[data-mid="${mid}"][data-side="home"]`).value;
