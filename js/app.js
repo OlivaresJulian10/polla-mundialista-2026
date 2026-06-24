@@ -307,12 +307,21 @@ function renderMatches() {
 }
 
 // Ventanita: partido en juego + próximo a jugar (en Mis pronósticos)
+// ¿El partido está en curso? (en vivo según el robot, O ya pasó su hora de
+// inicio y no ha terminado — así el 0-0 y el contador arrancan al instante)
+function enCurso(m) {
+  if (m.status === "live" || m.status === "halftime") return true;
+  if (m.status === "finished") return false;
+  if (!m.kickoff) return false;
+  const el = Date.now() - new Date(m.kickoff).getTime();
+  return el >= 0 && el < 2.5 * 3600 * 1000; // dentro de ~2.5h desde el inicio
+}
+
 function liveBoxHtml() {
   const ahora = Date.now();
-  const live = state.matches.find((m) => m.status === "live" || m.status === "halftime");
+  const live = state.matches.find(enCurso);
   const next = state.matches
-    .filter((m) => m.kickoff && new Date(m.kickoff).getTime() > ahora &&
-      m.status !== "live" && m.status !== "halftime" && m.home_score == null)
+    .filter((m) => m.kickoff && new Date(m.kickoff).getTime() > ahora && !enCurso(m) && m.status !== "finished")
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
   if (!live && !next) return "";
 
