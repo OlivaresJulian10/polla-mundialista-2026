@@ -317,46 +317,48 @@ function enCurso(m) {
   return el >= 0 && el < 2.5 * 3600 * 1000; // dentro de ~2.5h desde el inicio
 }
 
-function liveBoxHtml() {
-  const ahora = Date.now();
-  const live = state.matches.find(enCurso);
-  const next = state.matches
-    .filter((m) => m.kickoff && new Date(m.kickoff).getTime() > ahora && !enCurso(m) && m.status !== "finished")
-    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
-  if (!live && !next) return "";
+const _box = (n) => `<span class="lb-box">${n ?? ""}</span>`;
+const _boxes = (h, a, cls = "") =>
+  `<span class="lb-boxes ${cls}">${_box(h)}<span class="lb-x">-</span>${_box(a)}</span>`;
 
-  const box = (n) => `<span class="lb-box">${n ?? ""}</span>`;
-  const boxes = (h, a, cls = "") =>
-    `<span class="lb-boxes ${cls}">${box(h)}<span class="lb-x">-</span>${box(a)}</span>`;
-
-  let cards = "";
-  if (live) {
-    const min = live.status === "halftime" ? "⏸️ Entretiempo" : "🔴 " + liveMinute(live);
-    const p = state.myPreds[live.id];
-    let cmp = "";
-    if (p) { const pts = pointsFor(p, live); cmp = pts === 5 ? "🎯 ¡exacto!" : pts === 3 ? "✅ vas acertando" : "⏳ aún no suma"; }
-    cards += `<div class="lb-card lb-card-live lb-clickable" data-detail="${live.id}">
+function liveCard(m) {
+  const min = m.status === "halftime" ? "⏸️ Entretiempo" : "🔴 " + liveMinute(m);
+  const p = state.myPreds[m.id];
+  let cmp = "";
+  if (p) { const pts = pointsFor(p, m); cmp = pts === 5 ? "🎯 ¡exacto!" : pts === 3 ? "✅ vas acertando" : "⏳ aún no suma"; }
+  return `<div class="lb-card lb-card-live lb-clickable" data-detail="${m.id}">
       <div class="lb-card-head"><span class="lb-tag lb-live">🔴 EN JUEGO</span><span class="lb-when lb-when-live">${min}</span></div>
       <div class="lb-match">
-        <span class="lb-tm lb-tm-h"><span class="name">${live.home_team}</span>${crest(live.home_team)}</span>
-        ${boxes(live.home_score ?? 0, live.away_score ?? 0, "lb-boxes-live")}
-        <span class="lb-tm lb-tm-a">${crest(live.away_team)}<span class="name">${live.away_team}</span></span>
+        <span class="lb-tm lb-tm-h"><span class="name">${m.home_team}</span>${crest(m.home_team)}</span>
+        ${_boxes(m.home_score ?? 0, m.away_score ?? 0, "lb-boxes-live")}
+        <span class="lb-tm lb-tm-a">${crest(m.away_team)}<span class="name">${m.away_team}</span></span>
       </div>
       <div class="lb-foot">${p ? `Tu pronóstico: <b>${p.pred_home}–${p.pred_away}</b> · <span class="lb-cmp">${cmp}</span>` : "📝 No pronosticaste este partido"}<span class="lb-ver"> · ver detalle ▸</span></div>
     </div>`;
-  }
+}
+
+function liveBoxHtml() {
+  const ahora = Date.now();
+  const lives = state.matches.filter(enCurso).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  const next = state.matches
+    .filter((m) => m.kickoff && new Date(m.kickoff).getTime() > ahora && !enCurso(m) && m.status !== "finished")
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
+  if (!lives.length && !next) return "";
+
+  let cards = lives.map(liveCard).join("");
   if (next) {
     const p = state.myPreds[next.id];
     cards += `<div class="lb-card">
       <div class="lb-card-head"><span class="lb-tag lb-next">⏭️ PRÓXIMO</span><span class="lb-when">${fmtDate(next.kickoff)}</span></div>
       <div class="lb-match">
         <span class="lb-tm lb-tm-h"><span class="name">${next.home_team}</span>${crest(next.home_team)}</span>
-        ${p ? boxes(p.pred_home, p.pred_away, "lb-boxes-pred") : `<span class="lb-vs">vs</span>`}
+        ${p ? _boxes(p.pred_home, p.pred_away, "lb-boxes-pred") : `<span class="lb-vs">vs</span>`}
         <span class="lb-tm lb-tm-a">${crest(next.away_team)}<span class="name">${next.away_team}</span></span>
       </div>
       <div class="lb-foot ${p ? "" : "lb-foot-warn"}">${p ? "👆 Tu pronóstico" : "📝 Aún no has pronosticado este partido"}</div>
     </div>`;
   }
+  const live = lives.length;
   const titulo = live ? "🔴 EN VIVO" : "📡 Próximos partidos";
   return `<div class="livebox ${live ? "livebox-live" : ""}">
     <div class="lb-title">${titulo}</div>${cards}</div>`;
