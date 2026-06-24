@@ -132,6 +132,23 @@ main{max-width:920px; margin:0 auto; padding:1.2rem}
 .today-stats{display:flex; gap:1.1rem; flex-wrap:wrap; margin-top:.7rem; color:var(--muted); font-size:.92rem}
 .today-stats b{color:var(--text)}
 
+/* Ventanita "en juego / próximo" (Mis pronósticos) */
+.livebox{
+  background:linear-gradient(135deg, rgba(13,18,28,.85), rgba(20,26,38,.85));
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.1); border-left:4px solid var(--primary);
+  border-radius:12px; padding:.65rem .9rem; margin-bottom:1.2rem;
+  display:flex; flex-direction:column; gap:.45rem;
+}
+.lb-row{display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; font-size:.9rem}
+.lb-tag{font-size:.68rem; font-weight:800; padding:.15rem .55rem; border-radius:99px; white-space:nowrap}
+.lb-tag.lb-live{background:#3a1620; color:#ff6b81; animation:livePulse 1.4s ease-in-out infinite}
+.lb-tag.lb-next{background:#1c2a44; color:#93b4ff}
+.lb-teams{display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; flex:1; min-width:0; font-weight:600}
+.lb-teams b{color:var(--primary-2)}
+.lb-teams .crest{width:20px; height:20px}
+.lb-min{font-weight:800; color:var(--text); white-space:nowrap}
+
 /* Group blocks */
 .group{margin-bottom:1.8rem}
 .group-title{

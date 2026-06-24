@@ -67,9 +67,14 @@ const LOCK_MINUTES = 10;
 const isLocked = (m) =>
   m.kickoff && new Date(m.kickoff).getTime() - LOCK_MINUTES * 60000 <= Date.now();
 
-// Minuto aproximado de un partido en vivo (la fuente gratis no da el exacto).
-// Descuenta ~15 min del entretiempo para que el 2T no se infle.
+// Minuto del partido en vivo. Usa el EXACTO de API-Football (live_minute +
+// el tiempo corrido desde que se consultó). Si no hay, cae al aproximado.
 function liveMinute(m) {
+  if (m.live_minute != null && m.live_minute_at) {
+    let min = m.live_minute + Math.floor((Date.now() - new Date(m.live_minute_at).getTime()) / 60000);
+    if (min > 130) min = 130;
+    return min + "'"; // exacto
+  }
   if (!m.kickoff) return "";
   let e = Math.floor((Date.now() - new Date(m.kickoff).getTime()) / 60000);
   if (e < 0) return "0'";
@@ -289,6 +294,7 @@ function renderMatches() {
         <span>📝 <b>${pronosticados}</b> pronosticados</span>
       </div>
     </div>`;
+  html += liveBoxHtml();
   for (const key of Object.keys(byStage)) {
     const [stage, letter] = key.split(":");
     const title = stage === "group" ? `Grupo ${letter}` : STAGE_LABELS[stage] || stage;
@@ -298,6 +304,36 @@ function renderMatches() {
   }
   cont.innerHTML = html;
   wireSave(cont, "saveAllBtn", "saveHint");
+}
+
+// Ventanita: partido en juego + próximo a jugar (en Mis pronósticos)
+function liveBoxHtml() {
+  const ahora = Date.now();
+  const live = state.matches.find((m) => m.status === "live" || m.status === "halftime");
+  const next = state.matches
+    .filter((m) => m.kickoff && new Date(m.kickoff).getTime() > ahora &&
+      m.status !== "live" && m.status !== "halftime" && m.home_score == null)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
+  if (!live && !next) return "";
+
+  let rows = "";
+  if (live) {
+    const min = live.status === "halftime" ? "⏸️ Entretiempo" : liveMinute(live);
+    rows += `<div class="lb-row">
+      <span class="lb-tag lb-live">🔴 EN JUEGO</span>
+      <span class="lb-teams">${crest(live.home_team)} ${live.home_team}
+        <b>${live.home_score ?? 0}–${live.away_score ?? 0}</b>
+        ${live.away_team} ${crest(live.away_team)}</span>
+      <span class="lb-min">${min}</span></div>`;
+  }
+  if (next) {
+    rows += `<div class="lb-row">
+      <span class="lb-tag lb-next">⏭️ PRÓXIMO</span>
+      <span class="lb-teams">${crest(next.home_team)} ${next.home_team}
+        <span class="vs">vs</span> ${next.away_team} ${crest(next.away_team)}</span>
+      <span class="lb-min">${fmtDate(next.kickoff)}</span></div>`;
+  }
+  return `<div class="livebox">${rows}</div>`;
 }
 
 // Barra de guardado fija (se queda arriba al hacer scroll)
