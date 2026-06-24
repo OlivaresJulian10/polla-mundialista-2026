@@ -53,10 +53,12 @@ async function getFromFootballData() {
   });
   if (!res.ok) throw new Error(`football-data ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  const LIVE = new Set(["IN_PLAY", "PAUSED", "LIVE", "SUSPENDED"]);
+  const LIVE = new Set(["IN_PLAY", "LIVE", "SUSPENDED"]);
   return (data.matches || []).map((m) => ({
     home: toES(m.homeTeam?.name), away: toES(m.awayTeam?.name),
-    st: m.status === "FINISHED" ? "finished" : LIVE.has(m.status) ? "live" : "scheduled",
+    st: m.status === "FINISHED" ? "finished"
+      : m.status === "PAUSED" ? "halftime"
+      : LIVE.has(m.status) ? "live" : "scheduled",
     hs: m.score?.fullTime?.home, as: m.score?.fullTime?.away,
     kickoff: m.utcDate || null,
   }));
@@ -76,10 +78,11 @@ async function getFromSportsDB() {
         seen.add(ev.idEvent);
         const raw = (ev.strStatus || "").toLowerCase();
         const finished = raw === "ft" || raw.includes("finished") || raw.includes("aet") || raw.includes("pen");
-        const live = !finished && (/^\d/.test(raw) || raw.includes("h") || raw.includes("live"));
+        const half = !finished && (raw === "ht" || raw.includes("half"));
+        const live = !finished && !half && (/^\d/.test(raw) || raw.includes("1h") || raw.includes("2h") || raw.includes("live"));
         out.push({
           home: toES(ev.strHomeTeam), away: toES(ev.strAwayTeam),
-          st: finished ? "finished" : live ? "live" : "scheduled",
+          st: finished ? "finished" : half ? "halftime" : live ? "live" : "scheduled",
           hs: ev.intHomeScore == null ? null : +ev.intHomeScore,
           as: ev.intAwayScore == null ? null : +ev.intAwayScore,
           kickoff: ev.strTimestamp ? (ev.strTimestamp.endsWith("Z") ? ev.strTimestamp : ev.strTimestamp + "Z") : null,
@@ -120,8 +123,9 @@ async function main() {
       }
     }
 
-    // Estado en vivo / finalizado / programado
-    if (ev.st === "live" || ev.st === "finished") {
+    // Estado en juego (en vivo / entretiempo) / finalizado / programado
+    const enJuego = ev.st === "live" || ev.st === "halftime";
+    if (enJuego || ev.st === "finished") {
       if (ev.hs != null && ev.as != null) {
         const hs = +ev.hs, as = +ev.as;
         if (m.home_score !== hs) patch.home_score = hs;
@@ -129,10 +133,10 @@ async function main() {
       }
     }
     if (m.status !== ev.st && ev.st !== "scheduled") patch.status = ev.st;
-    else if (ev.st === "scheduled" && m.status === "live") patch.status = "scheduled"; // se reprogramó
+    else if (ev.st === "scheduled" && (m.status === "live" || m.status === "halftime")) patch.status = "scheduled";
 
     if (Object.keys(patch).length === 0) {
-      if (ev.st === "live") vivos++; else if (ev.st === "finished") sinCambios++; else sinJugar++;
+      if (enJuego) vivos++; else if (ev.st === "finished") sinCambios++; else sinJugar++;
       continue;
     }
 
@@ -142,10 +146,8 @@ async function main() {
     });
     if (!r.ok) { console.error(`❌ ${ev.home} vs ${ev.away}: ${r.status} ${await r.text()}`); continue; }
     if (patch.kickoff) horas++;
-    if (ev.st === "live") { console.log(`🔴 EN VIVO ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); vivos++; }
-    else if (ev.st === "finished" && (patch.home_score != null || patch.away_score != null || patch.status)) {
-      console.log(`✓ FINAL ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); resultados++;
-    }
+    if (enJuego) { console.log(`🔴 ${ev.st === "halftime" ? "ENTRETIEMPO" : "EN VIVO"} ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); vivos++; }
+    else if (ev.st === "finished") { console.log(`✓ FINAL ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); resultados++; }
   }
 
   console.log(`\nResumen → finalizados: ${resultados} | en vivo: ${vivos} | horas: ${horas} | sin cambios: ${sinCambios} | por jugar: ${sinJugar} | sin coincidencia: ${sinCoincidencia}`);

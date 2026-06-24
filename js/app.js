@@ -67,6 +67,16 @@ const LOCK_MINUTES = 10;
 const isLocked = (m) =>
   m.kickoff && new Date(m.kickoff).getTime() - LOCK_MINUTES * 60000 <= Date.now();
 
+// Minuto aproximado de un partido en vivo (la fuente gratis no da el exacto).
+// Descuenta ~15 min del entretiempo para que el 2T no se infle.
+function liveMinute(m) {
+  if (!m.kickoff) return "";
+  let e = Math.floor((Date.now() - new Date(m.kickoff).getTime()) / 60000);
+  if (e < 0) return "0'";
+  if (e > 45) e = Math.max(46, e - 15);
+  return e >= 90 ? "90+'" : `~${e}'`;
+}
+
 // Fecha (YYYY-MM-DD) en hora Colombia, para saber "qué partidos son hoy"
 const bogotaYMD = (d) => new Date(d).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 const todayYMD = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
@@ -451,7 +461,9 @@ function matchRow(m) {
 
   let right = `<span class="badge"></span>`;
   if (m.status === "live")
-    right = `<span class="badge live">🔴 EN VIVO ${m.home_score ?? 0}–${m.away_score ?? 0}</span>`;
+    right = `<span class="badge live">🔴 ${m.home_score ?? 0}–${m.away_score ?? 0} · ${liveMinute(m)}</span>`;
+  else if (m.status === "halftime")
+    right = `<span class="badge live">⏸️ ENTRETIEMPO ${m.home_score ?? 0}–${m.away_score ?? 0}</span>`;
   else if (hasResult) right = `<span class="badge result">Final ${m.home_score}–${m.away_score}</span>`;
   else if (locked) right = `<span class="badge locked">🔒 Cerrado</span>`;
 
