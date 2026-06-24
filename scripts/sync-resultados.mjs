@@ -165,22 +165,36 @@ async function main() {
       }
     }
 
-    // Estado efectivo: football-data manda en "finalizado"; API-Football manda en "en vivo".
+    // Estado efectivo. IMPORTANTE: el marcador EN VIVO solo se cree de API-Football
+    // (football-data en vivo gratis es poco confiable). football-data solo para FINAL.
     const lv = liveData.get(pairKey(ev.home, ev.away));
-    let st, hs, as;
-    if (ev.st === "finished") { st = "finished"; hs = ev.hs; as = ev.as; }
-    else if (lv) { st = lv.st; hs = lv.hs; as = lv.as; }
-    else { st = ev.st; hs = ev.hs; as = ev.as; }
+    const enProgreso = ev.st !== "finished" && ev.kickoff &&
+      (Date.now() - new Date(ev.kickoff).getTime() >= 0) &&
+      (Date.now() - new Date(ev.kickoff).getTime() < 2.5 * 3600 * 1000);
+    let st;
+    if (ev.st === "finished") st = "finished";
+    else if (lv) st = lv.st;            // live/halftime (API-Football, confiable)
+    else if (enProgreso) st = "live";   // en juego por reloj, pero sin datos confiables
+    else st = "scheduled";
     const enJuego = st === "live" || st === "halftime";
 
-    if ((enJuego || st === "finished") && hs != null && as != null) {
-      if (m.home_score !== +hs) patch.home_score = +hs;
-      if (m.away_score !== +as) patch.away_score = +as;
+    // Marcador
+    if (st === "finished" && ev.hs != null && ev.as != null) {
+      if (m.home_score !== +ev.hs) patch.home_score = +ev.hs;
+      if (m.away_score !== +ev.as) patch.away_score = +ev.as;
+    } else if (lv && lv.hs != null && lv.as != null) {        // en vivo confiable (API-Football)
+      if (m.home_score !== +lv.hs) patch.home_score = +lv.hs;
+      if (m.away_score !== +lv.as) patch.away_score = +lv.as;
+    } else if (enJuego && m.status !== "finished") {           // en vivo sin datos → 0-0 (no marcador errado)
+      if (m.home_score != null) patch.home_score = null;
+      if (m.away_score != null) patch.away_score = null;
     }
+
+    // Estado
     if (m.status !== st && st !== "scheduled") patch.status = st;
     else if (st === "scheduled" && (m.status === "live" || m.status === "halftime")) patch.status = "scheduled";
 
-    // Minuto + eventos (de API-Football). Al finalizar se conservan los eventos.
+    // Minuto + eventos (solo API-Football). Al finalizar se conservan los eventos.
     if (enJuego && lv) {
       if (st === "live" && lv.minute != null) { patch.live_minute = lv.minute; patch.live_minute_at = new Date().toISOString(); }
       else if (st === "halftime" && m.live_minute != null) { patch.live_minute = null; patch.live_minute_at = null; }
@@ -202,8 +216,10 @@ async function main() {
     });
     if (!r.ok) { console.error(`❌ ${ev.home} vs ${ev.away}: ${r.status} ${await r.text()}`); continue; }
     if (patch.kickoff) horas++;
-    if (enJuego) { console.log(`🔴 ${st === "halftime" ? "ENTRETIEMPO" : "EN VIVO"} ${m.home_team} ${hs}-${as} ${m.away_team} (${(lv?.events||[]).length} ev)`); vivos++; }
-    else if (st === "finished") { console.log(`✓ FINAL ${m.home_team} ${hs}-${as} ${m.away_team}`); resultados++; }
+    if (enJuego) {
+      const sc = lv ? `${lv.hs}-${lv.as}` : "s/d";
+      console.log(`🔴 ${st === "halftime" ? "ENTRETIEMPO" : "EN VIVO"} ${m.home_team} ${sc} ${m.away_team} (${(lv?.events || []).length} ev)`); vivos++;
+    } else if (st === "finished") { console.log(`✓ FINAL ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); resultados++; }
   }
 
   console.log(`\nResumen → finalizados: ${resultados} | en vivo: ${vivos} | horas: ${horas} | sin cambios: ${sinCambios} | por jugar: ${sinJugar} | sin coincidencia: ${sinCoincidencia}`);
