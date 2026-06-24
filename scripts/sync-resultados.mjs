@@ -24,6 +24,7 @@ const EN2ES = {
   "mexico": "México", "south africa": "Sudáfrica", "south korea": "Corea del Sur",
   "czech republic": "Chequia", "czechia": "Chequia", "canada": "Canadá",
   "bosnia and herzegovina": "Bosnia y Herzegovina", "bosnia-herzegovina": "Bosnia y Herzegovina",
+  "bosnia & herzegovina": "Bosnia y Herzegovina", "korea republic": "Corea del Sur", "ir iran": "Irán",
   "qatar": "Catar", "switzerland": "Suiza", "usa": "Estados Unidos",
   "united states": "Estados Unidos", "paraguay": "Paraguay", "australia": "Australia",
   "turkey": "Turquía", "türkiye": "Turquía", "turkiye": "Turquía", "brazil": "Brasil",
@@ -107,15 +108,17 @@ async function getLiveData() {
     const map = new Map();
     for (const f of (j.response || [])) {
       if (!/world cup/i.test(f.league?.name || "")) continue;
+      const short = f.fixture?.status?.short;
+      const st = short === "HT" ? "halftime" : "live"; // live=all solo trae partidos en juego
       const events = (f.events || [])
         .filter((e) => ["Goal", "subst", "Card"].includes(e.type))
         .map((e) => ({
           min: e.time?.elapsed ?? null, extra: e.time?.extra ?? null,
           type: e.type, detail: e.detail || "",
-          team: e.team?.name || "", player: e.player?.name || "", assist: e.assist?.name || "",
+          team: toES(e.team?.name || ""), player: e.player?.name || "", assist: e.assist?.name || "",
         }));
       map.set(pairKey(toES(f.teams?.home?.name), toES(f.teams?.away?.name)),
-        { minute: f.fixture?.status?.elapsed ?? null, events });
+        { st, minute: f.fixture?.status?.elapsed ?? null, hs: f.goals?.home, as: f.goals?.away, events });
     }
     return map;
   } catch (e) { console.warn("API-Football falló:", e.message); return new Map(); }
@@ -130,10 +133,15 @@ async function main() {
   if (!events) { events = await getFromSportsDB(); fuente = "TheSportsDB (respaldo)"; }
   console.log(`Fuente: ${fuente} | partidos: ${events.length}`);
 
-  // Minuto exacto solo si hay algo en vivo (cuida el cupo de API-Football)
-  const hayVivos = events.some((e) => e.st === "live");
-  const liveData = hayVivos ? await getLiveData() : new Map();
-  if (hayVivos) console.log(`En vivo (API-Football): ${liveData.size}`);
+  // ¿Posiblemente hay partidos en vivo? (por reloj o por football-data) → consulto API-Football.
+  const posibleVivo = events.some((e) => {
+    if (e.st === "live" || e.st === "halftime") return true;
+    if (e.st === "finished" || !e.kickoff) return false;
+    const el = Date.now() - new Date(e.kickoff).getTime();
+    return el >= 0 && el < 2.5 * 3600 * 1000;
+  });
+  const liveData = posibleVivo ? await getLiveData() : new Map();
+  if (posibleVivo) console.log(`API-Football en vivo: ${liveData.size}`);
 
   // Tolerante: si aún no existen las columnas nuevas, reintenta sin ellas
   let mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status,live_minute`, { headers });
@@ -157,33 +165,34 @@ async function main() {
       }
     }
 
-    // Estado en juego (en vivo / entretiempo) / finalizado / programado
-    const enJuego = ev.st === "live" || ev.st === "halftime";
-    if (enJuego || ev.st === "finished") {
-      if (ev.hs != null && ev.as != null) {
-        const hs = +ev.hs, as = +ev.as;
-        if (m.home_score !== hs) patch.home_score = hs;
-        if (m.away_score !== as) patch.away_score = as;
-      }
-    }
-    if (m.status !== ev.st && ev.st !== "scheduled") patch.status = ev.st;
-    else if (ev.st === "scheduled" && (m.status === "live" || m.status === "halftime")) patch.status = "scheduled";
+    // Estado efectivo: football-data manda en "finalizado"; API-Football manda en "en vivo".
+    const lv = liveData.get(pairKey(ev.home, ev.away));
+    let st, hs, as;
+    if (ev.st === "finished") { st = "finished"; hs = ev.hs; as = ev.as; }
+    else if (lv) { st = lv.st; hs = lv.hs; as = lv.as; }
+    else { st = ev.st; hs = ev.hs; as = ev.as; }
+    const enJuego = st === "live" || st === "halftime";
 
-    // Minuto exacto + eventos (solo en vivo). Al finalizar se conservan los eventos.
-    if (ev.st === "live") {
-      const d = liveData.get(pairKey(ev.home, ev.away));
-      if (d) {
-        if (d.minute != null) { patch.live_minute = d.minute; patch.live_minute_at = new Date().toISOString(); }
-        if (d.events) patch.live_events = d.events;
-      }
-    } else if (ev.st !== "finished" && m.live_minute != null) {
+    if ((enJuego || st === "finished") && hs != null && as != null) {
+      if (m.home_score !== +hs) patch.home_score = +hs;
+      if (m.away_score !== +as) patch.away_score = +as;
+    }
+    if (m.status !== st && st !== "scheduled") patch.status = st;
+    else if (st === "scheduled" && (m.status === "live" || m.status === "halftime")) patch.status = "scheduled";
+
+    // Minuto + eventos (de API-Football). Al finalizar se conservan los eventos.
+    if (enJuego && lv) {
+      if (st === "live" && lv.minute != null) { patch.live_minute = lv.minute; patch.live_minute_at = new Date().toISOString(); }
+      else if (st === "halftime" && m.live_minute != null) { patch.live_minute = null; patch.live_minute_at = null; }
+      if (lv.events && lv.events.length) patch.live_events = lv.events;
+    } else if (st !== "finished" && m.live_minute != null) {
       patch.live_minute = null; patch.live_minute_at = null;
-    } else if (ev.st === "finished" && m.live_minute != null) {
-      patch.live_minute = null; patch.live_minute_at = null; // limpia minuto pero CONSERVA live_events
+    } else if (st === "finished" && m.live_minute != null) {
+      patch.live_minute = null; patch.live_minute_at = null; // conserva live_events
     }
 
     if (Object.keys(patch).length === 0) {
-      if (enJuego) vivos++; else if (ev.st === "finished") sinCambios++; else sinJugar++;
+      if (enJuego) vivos++; else if (st === "finished") sinCambios++; else sinJugar++;
       continue;
     }
 
@@ -193,8 +202,8 @@ async function main() {
     });
     if (!r.ok) { console.error(`❌ ${ev.home} vs ${ev.away}: ${r.status} ${await r.text()}`); continue; }
     if (patch.kickoff) horas++;
-    if (enJuego) { console.log(`🔴 ${ev.st === "halftime" ? "ENTRETIEMPO" : "EN VIVO"} ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); vivos++; }
-    else if (ev.st === "finished") { console.log(`✓ FINAL ${m.home_team} ${ev.hs}-${ev.as} ${m.away_team}`); resultados++; }
+    if (enJuego) { console.log(`🔴 ${st === "halftime" ? "ENTRETIEMPO" : "EN VIVO"} ${m.home_team} ${hs}-${as} ${m.away_team} (${(lv?.events||[]).length} ev)`); vivos++; }
+    else if (st === "finished") { console.log(`✓ FINAL ${m.home_team} ${hs}-${as} ${m.away_team}`); resultados++; }
   }
 
   console.log(`\nResumen → finalizados: ${resultados} | en vivo: ${vivos} | horas: ${horas} | sin cambios: ${sinCambios} | por jugar: ${sinJugar} | sin coincidencia: ${sinCoincidencia}`);
