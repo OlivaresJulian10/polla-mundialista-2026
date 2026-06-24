@@ -168,29 +168,24 @@ async function main() {
       }
     }
 
-    // Estado efectivo. IMPORTANTE: el marcador EN VIVO solo se cree de API-Football
-    // (football-data en vivo gratis es poco confiable). football-data solo para FINAL.
+    // Estado y marcador. Prioridad: API-Football (exacto + minuto + goles) >
+    // football-data en vivo (sin minuto/goles, va un poco atrasado) > reloj.
     const lv = liveData.get(pairKey(ev.home, ev.away));
     const enProgreso = ev.st !== "finished" && ev.kickoff &&
       (Date.now() - new Date(ev.kickoff).getTime() >= 0) &&
       (Date.now() - new Date(ev.kickoff).getTime() < 2.5 * 3600 * 1000);
-    let st;
-    if (ev.st === "finished") st = "finished";
-    else if (lv) st = lv.st;            // live/halftime (API-Football, confiable)
-    else if (enProgreso) st = "live";   // en juego por reloj, pero sin datos confiables
-    else st = "scheduled";
+    let st, shs = null, sas = null;
+    if (ev.st === "finished") { st = "finished"; shs = ev.hs; sas = ev.as; }
+    else if (lv) { st = lv.st; shs = lv.hs; sas = lv.as; }
+    else if (ev.st === "live" || ev.st === "halftime") { st = ev.st; shs = ev.hs; sas = ev.as; }
+    else if (enProgreso) { st = "live"; }
+    else { st = "scheduled"; }
     const enJuego = st === "live" || st === "halftime";
 
-    // Marcador
-    if (st === "finished" && ev.hs != null && ev.as != null) {
-      if (m.home_score !== +ev.hs) patch.home_score = +ev.hs;
-      if (m.away_score !== +ev.as) patch.away_score = +ev.as;
-    } else if (lv && lv.hs != null && lv.as != null) {        // en vivo confiable (API-Football)
-      if (m.home_score !== +lv.hs) patch.home_score = +lv.hs;
-      if (m.away_score !== +lv.as) patch.away_score = +lv.as;
-    } else if (enJuego && afConsulted && m.status !== "finished") { // confirmado sin datos → 0-0 (no marcador errado)
-      if (m.home_score != null) patch.home_score = null;
-      if (m.away_score != null) patch.away_score = null;
+    // Marcador (de la mejor fuente disponible)
+    if (shs != null && sas != null) {
+      if (m.home_score !== +shs) patch.home_score = +shs;
+      if (m.away_score !== +sas) patch.away_score = +sas;
     }
 
     // Estado
