@@ -256,6 +256,12 @@ async function loadMatchesAndPreds() {
 // =====================================================================
 //  Vista: Mis pronósticos
 // =====================================================================
+const PHASES = [
+  ["group", "⚽ Grupos"], ["r32", "16avos"], ["r16", "Octavos"],
+  ["qf", "Cuartos"], ["sf", "Semis"], ["third", "3er puesto"], ["final", "Final"],
+];
+let phaseFilter = null;
+
 function renderMatches() {
   const cont = el("matchesContainer");
   if (!state.matches.length) {
@@ -276,9 +282,20 @@ function renderMatches() {
     }
   }
 
-  // Agrupar por etapa y, dentro de grupos, por letra
+  // Fases disponibles (solo las que tienen partidos)
+  const avail = PHASES.filter(([k]) => state.matches.some((m) => m.stage === k));
+  // Fase por defecto: la del próximo partido que se juega (o la primera disponible)
+  if (phaseFilter === null || !avail.some(([k]) => k === phaseFilter)) {
+    const prox = state.matches
+      .filter((m) => m.kickoff && new Date(m.kickoff) > new Date())
+      .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
+    phaseFilter = prox ? prox.stage : (avail[0]?.[0] || "group");
+  }
+
+  // Partidos de la fase elegida, agrupados
   const byStage = {};
   for (const m of state.matches) {
+    if (m.stage !== phaseFilter) continue;
     const key = m.stage === "group" ? "group:" + m.group_letter : m.stage;
     (byStage[key] ||= []).push(m);
   }
@@ -295,6 +312,8 @@ function renderMatches() {
       </div>
     </div>`;
   html += liveBoxHtml();
+  html += `<div class="phase-bar">${avail.map(([k, lbl]) =>
+    `<button class="phase-chip ${k === phaseFilter ? "active" : ""}" data-phase="${k}">${lbl}</button>`).join("")}</div>`;
   for (const key of Object.keys(byStage)) {
     const [stage, letter] = key.split(":");
     const title = stage === "group" ? `Grupo ${letter}` : STAGE_LABELS[stage] || stage;
@@ -304,6 +323,9 @@ function renderMatches() {
   }
   cont.innerHTML = html;
   wireSave(cont, "saveAllBtn", "saveHint");
+  cont.querySelectorAll("[data-phase]").forEach((b) => {
+    b.onclick = () => { phaseFilter = b.dataset.phase; renderMatches(); };
+  });
 }
 
 // Ventanita: partido en juego + próximo a jugar (en Mis pronósticos)
