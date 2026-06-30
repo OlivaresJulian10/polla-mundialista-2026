@@ -261,6 +261,7 @@ const PHASES = [
   ["qf", "Cuartos"], ["sf", "Semis"], ["third", "3er puesto"], ["final", "Final"],
 ];
 let phaseFilter = null;
+let adminPhase = null;
 
 function renderMatches() {
   const cont = el("matchesContainer");
@@ -674,13 +675,18 @@ function renderAdmin() {
   if (!state.profile?.is_admin) return;
   const cont = el("adminContainer");
 
+  const avail = PHASES.filter(([k]) => state.matches.some((m) => m.stage === k));
+  if (adminPhase === null || !avail.some(([k]) => k === adminPhase)) adminPhase = avail[0]?.[0] || "group";
+
   const byStage = {};
   for (const m of state.matches) {
+    if (m.stage !== adminPhase) continue;
     const key = m.stage === "group" ? "group:" + m.group_letter : m.stage;
     (byStage[key] ||= []).push(m);
   }
 
-  let html = "";
+  let html = `<div class="phase-bar">${avail.map(([k, lbl]) =>
+    `<button class="phase-chip ${k === adminPhase ? "active" : ""}" data-aphase="${k}">${lbl}</button>`).join("")}</div>`;
   for (const key of Object.keys(byStage)) {
     const [stage, letter] = key.split(":");
     const title = stage === "group" ? `Grupo ${letter}` : STAGE_LABELS[stage] || stage;
@@ -707,6 +713,9 @@ function renderAdmin() {
 
   cont.querySelectorAll("[data-save]").forEach((btn) => {
     btn.onclick = () => saveResult(Number(btn.dataset.save));
+  });
+  cont.querySelectorAll("[data-aphase]").forEach((b) => {
+    b.onclick = () => { adminPhase = b.dataset.aphase; renderAdmin(); };
   });
 
   loadParticipation();
