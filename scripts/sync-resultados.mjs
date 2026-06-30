@@ -56,8 +56,10 @@ async function getFromFootballData() {
   if (!res.ok) throw new Error(`football-data ${res.status}: ${await res.text()}`);
   const data = await res.json();
   const LIVE = new Set(["IN_PLAY", "LIVE", "SUSPENDED"]);
+  const teamEs = (n) => (!n || /^tbd$/i.test(n.trim())) ? "Por definir" : toES(n);
   return (data.matches || []).map((m) => ({
-    home: toES(m.homeTeam?.name), away: toES(m.awayTeam?.name),
+    id: m.id,
+    home: teamEs(m.homeTeam?.name), away: teamEs(m.awayTeam?.name),
     st: m.status === "FINISHED" ? "finished"
       : m.status === "PAUSED" ? "halftime"
       : LIVE.has(m.status) ? "live" : "scheduled",
@@ -147,18 +149,29 @@ async function main() {
   if (afConsulted) console.log(`API-Football en vivo: ${liveData.size}`);
 
   // Tolerante: si aún no existen las columnas nuevas, reintenta sin ellas
-  let mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status,live_minute`, { headers });
+  let mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status,live_minute,ext_id`, { headers });
+  if (!mRes.ok) mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status,live_minute`, { headers });
   if (!mRes.ok) mRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=id,home_team,away_team,home_score,away_score,kickoff,status`, { headers });
   const matches = await mRes.json();
-  const idx = new Map();
-  for (const m of matches) idx.set(pairKey(m.home_team, m.away_team), m);
+
+  // Grupos: emparejan por equipos. Eliminatorias: por ext_id (football-data).
+  const byPair = new Map(events.map((e) => [pairKey(e.home, e.away), e]));
+  const byId = new Map(events.filter((e) => e.id != null).map((e) => [e.id, e]));
 
   let resultados = 0, vivos = 0, horas = 0, sinCambios = 0, sinJugar = 0, sinCoincidencia = 0;
 
-  for (const ev of events) {
-    const m = idx.get(pairKey(ev.home, ev.away));
-    if (!m) { sinCoincidencia++; continue; }
+  for (const m of matches) {
+    const ev = m.ext_id != null
+      ? byId.get(Number(m.ext_id))
+      : byPair.get(pairKey(m.home_team, m.away_team));
+    if (!ev) { sinCoincidencia++; continue; }
     const patch = {};
+
+    // Eliminatorias: actualizar los equipos cuando se definan / cambien
+    if (m.ext_id != null) {
+      if (ev.home && m.home_team !== ev.home) patch.home_team = ev.home;
+      if (ev.away && m.away_team !== ev.away) patch.away_team = ev.away;
+    }
 
     // Horario (cualquier estado)
     if (ev.kickoff) {
